@@ -1,5 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using StockSync.Inventory.Application.Productos;
+using StockSync.Inventory.Domain.Repositories;
 using StockSync.Inventory.Infrastructure;
+using StockSync.Inventory.Infrastructure.Repositories;
+using StockSync.Inventory.WebApi.ExceptionHandling;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,11 +11,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<InventoryDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddScoped<IProductoRepository, ProductoRepository>();
+builder.Services.AddScoped<IProductoService, ProductoService>();
+
 // Add services to the container.
+builder.Services.AddControllers();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -23,5 +35,6 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 // TODO para el equipo: Agregar los endpoints del Inventory Service aquí o usar Controllers.
+app.MapControllers();
 
 app.Run();

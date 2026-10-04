@@ -15,6 +15,7 @@ public class InventoryDbContext : DbContext
     // public DbSet<Categoria> Categorias { get; set; }
 
     public DbSet<Producto> Productos => Set<Producto>();
+    public DbSet<Stock> Stocks => Set<Stock>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

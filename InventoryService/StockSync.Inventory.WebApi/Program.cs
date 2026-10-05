@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using StockSync.Inventory.Application.Categorias;
 using StockSync.Inventory.Application.Productos;
 using StockSync.Inventory.Domain.Repositories;
 using StockSync.Inventory.Infrastructure;
@@ -13,6 +14,9 @@ builder.Services.AddDbContext<InventoryDbContext>(options =>
 
 builder.Services.AddScoped<IProductoRepository, ProductoRepository>();
 builder.Services.AddScoped<IProductoService, ProductoService>();
+
+builder.Services.AddScoped<ICategoriaRepository, CategoriaRepository>();
+builder.Services.AddScoped<ICategoriaService, CategoriaService>();
 
 // Add services to the container.
 builder.Services.AddControllers();

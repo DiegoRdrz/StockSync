@@ -8,15 +8,18 @@ namespace StockSync.Inventory.Application.Productos;
 public class ProductoService : IProductoService
 {
     private readonly IProductoRepository _productoRepository;
+    private readonly ICategoriaRepository _categoriaRepository;
 
-    public ProductoService(IProductoRepository productoRepository)
+    public ProductoService(IProductoRepository productoRepository, ICategoriaRepository categoriaRepository)
     {
         _productoRepository = productoRepository;
+        _categoriaRepository = categoriaRepository;
     }
 
     public async Task<ProductoResponse> CrearAsync(ProductoRequest request, CancellationToken cancellationToken)
     {
         LanzarSiHayErrores(ProductoValidator.Validar(request));
+        await AsegurarCategoriaValidaAsync(request.CategoriaId, cancellationToken);
         await AsegurarSkuDisponibleAsync(request.Sku, null, cancellationToken);
 
         var producto = Producto.Crear(
@@ -68,6 +71,7 @@ public class ProductoService : IProductoService
         var producto = await _productoRepository.ObtenerParaActualizarAsync(id, cancellationToken)
             ?? throw ProductoNoEncontrado(id);
 
+        await AsegurarCategoriaValidaAsync(request.CategoriaId, cancellationToken);
         await AsegurarSkuDisponibleAsync(request.Sku, id, cancellationToken);
 
         producto.Actualizar(
@@ -91,6 +95,18 @@ public class ProductoService : IProductoService
 
         producto.Desactivar();
         await _productoRepository.GuardarCambiosAsync(cancellationToken);
+    }
+
+    private async Task AsegurarCategoriaValidaAsync(Guid? categoriaId, CancellationToken cancellationToken)
+    {
+        if (categoriaId is null)
+            return;
+
+        if (!await _categoriaRepository.ExisteActivaAsync(categoriaId.Value, cancellationToken))
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                [nameof(ProductoRequest.CategoriaId)] = [$"La categoría '{categoriaId}' no existe o está dada de baja."]
+            });
     }
 
     private async Task AsegurarSkuDisponibleAsync(string sku, Guid? excluirId, CancellationToken cancellationToken)

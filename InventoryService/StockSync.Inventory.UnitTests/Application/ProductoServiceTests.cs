@@ -8,11 +8,12 @@ namespace StockSync.Inventory.UnitTests.Application;
 public class ProductoServiceTests
 {
     private readonly FakeProductoRepository _repository = new();
+    private readonly FakeCategoriaRepository _categoriaRepository = new();
     private readonly ProductoService _service;
 
     public ProductoServiceTests()
     {
-        _service = new ProductoService(_repository);
+        _service = new ProductoService(_repository, _categoriaRepository);
     }
 
     private static ProductoRequest Request(string sku = "FER-001") =>
@@ -150,5 +151,44 @@ public class ProductoServiceTests
             Guardados++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeCategoriaRepository : ICategoriaRepository
+    {
+        public List<Categoria> Categorias { get; } = [];
+
+        public Task<Categoria?> ObtenerPorIdAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(Categorias.FirstOrDefault(c => c.Id == id && c.Activo));
+
+        public Task<Categoria?> ObtenerParaActualizarAsync(Guid id, CancellationToken cancellationToken) =>
+            ObtenerPorIdAsync(id, cancellationToken);
+
+        public Task<(IReadOnlyList<Categoria> Items, int Total)> ListarAsync(
+            string? nombre,
+            int skip,
+            int take,
+            CancellationToken cancellationToken)
+        {
+            var activas = Categorias.Where(c => c.Activo).ToList();
+            IReadOnlyList<Categoria> items = activas.Skip(skip).Take(take).ToList();
+            return Task.FromResult((items, activas.Count));
+        }
+
+        public Task<bool> ExisteNombreAsync(string nombre, Guid? excluirId, CancellationToken cancellationToken) =>
+            Task.FromResult(Categorias.Any(c => Categoria.NormalizarNombre(c.Nombre) == nombre && c.Id != excluirId));
+
+        public Task<bool> ExisteActivaAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(Categorias.Any(c => c.Id == id && c.Activo));
+
+        public Task<bool> TieneProductosActivosAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task AgregarAsync(Categoria categoria, CancellationToken cancellationToken)
+        {
+            Categorias.Add(categoria);
+            return Task.CompletedTask;
+        }
+
+        public Task GuardarCambiosAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

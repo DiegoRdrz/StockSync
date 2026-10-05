@@ -1,6 +1,61 @@
-@StockSync.Inventory.WebApi_HostAddress = http://localhost:5041
+@StockSync.Inventory.WebApi_HostAddress = http://localhost:5001
 
-GET {{StockSync.Inventory.WebApi_HostAddress}}/weatherforecast/
-Accept: application/json
+### 1. Crear una Categoría
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/categorias
+Content-Type: application/json
 
-###
+{
+  "nombre": "Herramientas",
+  "descripcion": "Herramientas de uso general"
+}
+
+> {%
+    client.global.set("categoria_id", response.body.id);
+%}
+
+### 2. Crear un Producto con la Categoría
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/productos
+Content-Type: application/json
+
+{
+  "nombre": "Martillo",
+  "sku": "HER-001",
+  "descripcion": "Martillo de acero",
+  "precioCompra": 10.50,
+  "precioVenta": 15.00,
+  "stockMinimo": 5,
+  "categoriaId": "{{categoria_id}}"
+}
+
+> {%
+    client.global.set("producto_id", response.body.id);
+%}
+
+### 3. Listar Productos de la Categoría
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/categorias/{{categoria_id}}/productos
+
+### 4. Intentar borrar Categoría (Debe fallar 409 Conflict)
+DELETE {{StockSync.Inventory.WebApi_HostAddress}}/api/categorias/{{categoria_id}}
+
+### 5. Intentar crear Categoría con mismo nombre (Debe fallar 409 Conflict)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/categorias
+Content-Type: application/json
+
+{
+  "nombre": " herramientas ",
+  "descripcion": "Duplicado"
+}
+
+### 6. Intentar crear Producto con Categoría inexistente (Debe fallar 400 Bad Request)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/productos
+Content-Type: application/json
+
+{
+  "nombre": "Taladro",
+  "sku": "HER-002",
+  "descripcion": "Taladro",
+  "precioCompra": 50.00,
+  "precioVenta": 75.00,
+  "stockMinimo": 2,
+  "categoriaId": "00000000-0000-0000-0000-000000000000"
+}

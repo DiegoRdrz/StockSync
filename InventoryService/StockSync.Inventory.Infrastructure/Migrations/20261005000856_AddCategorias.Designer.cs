@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StockSync.Inventory.Infrastructure;
@@ -11,9 +12,11 @@ using StockSync.Inventory.Infrastructure;
 namespace StockSync.Inventory.Infrastructure.Migrations
 {
     [DbContext(typeof(InventoryDbContext))]
-    partial class InventoryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261005000856_AddCategorias")]
+    partial class AddCategorias
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -111,37 +114,6 @@ namespace StockSync.Inventory.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("CategoriaId")
                         .OnDelete(DeleteBehavior.Restrict);
-            modelBuilder.Entity("StockSync.Inventory.Domain.Entities.Stock", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Cantidad")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("ProductoId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SucursalId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductoId", "SucursalId")
-                        .IsUnique();
-
-                    b.HasIndex("SucursalId");
-
-                    b.ToTable("Stocks", (string)null);
-                });
-
-            modelBuilder.Entity("StockSync.Inventory.Domain.Entities.Stock", b =>
-                {
-                    b.HasOne("StockSync.Inventory.Domain.Entities.Producto", null)
-                        .WithMany()
-                        .HasForeignKey("ProductoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

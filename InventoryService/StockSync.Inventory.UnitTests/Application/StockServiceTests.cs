@@ -312,9 +312,6 @@ public partial class StockServiceTests
         public Task<Stock?> ObtenerParaActualizarAsync(Guid id, CancellationToken cancellationToken) =>
             ObtenerPorIdAsync(id, cancellationToken);
 
-        public Task<Stock?> ObtenerPorProductoYSucursalAsync(Guid productoId, Guid sucursalId, CancellationToken cancellationToken) =>
-            Task.FromResult(Stocks.FirstOrDefault(s => s.ProductoId == productoId && s.SucursalId == sucursalId));
-
         public Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorSucursalAsync(
             Guid sucursalId, int skip, int take, CancellationToken cancellationToken) =>
             Paginar(Stocks.Where(s => s.SucursalId == sucursalId).ToList(), skip, take);

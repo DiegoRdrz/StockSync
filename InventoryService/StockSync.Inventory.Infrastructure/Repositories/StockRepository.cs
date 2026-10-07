@@ -25,11 +25,6 @@ public class StockRepository : IStockRepository
             .FromSqlInterpolated($"SELECT * FROM \"Stocks\" WHERE \"Id\" = {id} FOR UPDATE")
             .FirstOrDefaultAsync(cancellationToken);
 
-    public Task<Stock?> ObtenerPorProductoYSucursalAsync(Guid productoId, Guid sucursalId, CancellationToken cancellationToken) =>
-        _context.Stocks
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.ProductoId == productoId && s.SucursalId == sucursalId, cancellationToken);
-
     public async Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorSucursalAsync(
         Guid sucursalId, int skip, int take, CancellationToken cancellationToken)
     {

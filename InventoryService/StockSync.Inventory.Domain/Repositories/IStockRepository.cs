@@ -10,8 +10,6 @@ public interface IStockRepository
     // concurrentes sobre el mismo stock esperan su turno y leen el saldo ya confirmado.
     Task<Stock?> ObtenerParaActualizarAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<Stock?> ObtenerPorProductoYSucursalAsync(Guid productoId, Guid sucursalId, CancellationToken cancellationToken);
-
     // Excluye los stocks de productos dados de baja.
     Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorSucursalAsync(
         Guid sucursalId, int skip, int take, CancellationToken cancellationToken);

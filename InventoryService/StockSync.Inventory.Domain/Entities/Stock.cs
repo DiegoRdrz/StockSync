@@ -32,10 +32,17 @@ public class Stock
         };
     }
 
-    public void ActualizarCantidad(int nuevaCantidad)
+    // Todo cambio de saldo deja un movimiento para que el historial explique siempre el saldo actual.
+    // Devuelve null si la cantidad no cambia, porque un movimiento siempre tiene cantidad positiva.
+    public MovimientoStock? ActualizarCantidad(int nuevaCantidad)
     {
         AsegurarCantidadValida(nuevaCantidad);
+        if (nuevaCantidad == Cantidad)
+            return null;
+
+        var cantidadAnterior = Cantidad;
         Cantidad = nuevaCantidad;
+        return new MovimientoStock(this, TipoMovimientoStock.Ajuste, Math.Abs(nuevaCantidad - cantidadAnterior), cantidadAnterior);
     }
 
     public MovimientoStock RegistrarMovimiento(TipoMovimientoStock tipo, int cantidad)
@@ -43,7 +50,7 @@ public class Stock
         if (cantidad <= 0)
             throw new DomainException("La cantidad del movimiento debe ser mayor que cero.");
 
-        if (!Enum.IsDefined(tipo))
+        if (tipo is not (TipoMovimientoStock.Entrada or TipoMovimientoStock.Salida))
             throw new DomainException("El tipo de movimiento no es válido.");
 
         if (tipo == TipoMovimientoStock.Salida && cantidad > Cantidad)

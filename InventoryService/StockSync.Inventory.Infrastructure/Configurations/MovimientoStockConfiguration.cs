@@ -12,7 +12,7 @@ public class MovimientoStockConfiguration : IEntityTypeConfiguration<MovimientoS
         {
             table.HasCheckConstraint("CK_MovimientosStock_Cantidad", "\"Cantidad\" > 0");
             table.HasCheckConstraint("CK_MovimientosStock_Saldos", "\"CantidadAnterior\" >= 0 AND \"CantidadPosterior\" >= 0");
-            table.HasCheckConstraint("CK_MovimientosStock_Tipo", "\"Tipo\" IN ('Entrada', 'Salida')");
+            table.HasCheckConstraint("CK_MovimientosStock_Tipo", "\"Tipo\" IN ('Entrada', 'Salida', 'Ajuste')");
         });
         builder.HasKey(m => m.Id);
         builder.Property(m => m.Id).ValueGeneratedNever();

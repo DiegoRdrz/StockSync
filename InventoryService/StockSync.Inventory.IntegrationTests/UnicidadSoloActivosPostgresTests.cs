@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using StockSync.Inventory.Application.Categorias;
 using StockSync.Inventory.Application.Common.Exceptions;
 using StockSync.Inventory.Application.Productos;
@@ -9,35 +8,8 @@ using StockSync.Inventory.Infrastructure.Repositories;
 
 namespace StockSync.Inventory.IntegrationTests;
 
-public class UnicidadSoloActivosPostgresTests : IAsyncLifetime
+public class UnicidadSoloActivosPostgresTests : PostgresTestBase
 {
-    private readonly string _database = $"stocksync_test_{Guid.NewGuid():N}";
-    private string _connectionString = null!;
-
-    public async Task InitializeAsync()
-    {
-        var adminConnection = Environment.GetEnvironmentVariable("STOCKSYNC_TEST_POSTGRES")!;
-        await using var admin = new NpgsqlConnection(adminConnection);
-        await admin.OpenAsync();
-        await using var command = new NpgsqlCommand($"CREATE DATABASE \"{_database}\"", admin);
-        await command.ExecuteNonQueryAsync();
-        _connectionString = new NpgsqlConnectionStringBuilder(adminConnection) { Database = _database, Pooling = false }.ConnectionString;
-
-        await using var context = CrearContexto();
-        await context.Database.MigrateAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        await using var admin = new NpgsqlConnection(Environment.GetEnvironmentVariable("STOCKSYNC_TEST_POSTGRES"));
-        await admin.OpenAsync();
-        await using var command = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_database}\" WITH (FORCE)", admin);
-        await command.ExecuteNonQueryAsync();
-    }
-
-    private InventoryDbContext CrearContexto() => new(
-        new DbContextOptionsBuilder<InventoryDbContext>().UseNpgsql(_connectionString).Options);
-
     [PostgreSqlFact]
     public async Task Categoria_RecrearYRenombrarConNombreDeBaja_SePermite()
     {

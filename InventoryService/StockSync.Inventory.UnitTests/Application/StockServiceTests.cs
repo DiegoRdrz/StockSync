@@ -13,7 +13,7 @@ public partial class StockServiceTests
 
     public StockServiceTests()
     {
-        _service = new StockService(_stockRepository, _productoRepository);
+        _service = new StockService(_stockRepository, _productoRepository, _movimientos);
     }
 
     private Producto CrearProducto(string sku = "FER-001")
@@ -36,6 +36,19 @@ public partial class StockServiceTests
         Assert.Equal(20, response.Cantidad);
         Assert.Single(_stockRepository.Stocks);
         Assert.Equal(1, _stockRepository.Guardados);
+        var saldoInicial = Assert.Single(_movimientos.Items);
+        Assert.Equal(TipoMovimientoStock.Ajuste, saldoInicial.Tipo);
+        Assert.Equal((0, 20), (saldoInicial.CantidadAnterior, saldoInicial.CantidadPosterior));
+    }
+
+    [Fact]
+    public async Task CrearAsync_SaldoInicialCero_NoRegistraMovimiento()
+    {
+        var producto = CrearProducto();
+
+        await _service.CrearAsync(new StockRequest(producto.Id, Guid.NewGuid(), 0), CancellationToken.None);
+
+        Assert.Empty(_movimientos.Items);
     }
 
     [Fact]
@@ -166,6 +179,9 @@ public partial class StockServiceTests
         Assert.Equal(producto.Id, actualizado.ProductoId);
         Assert.Equal(sucursalId, actualizado.SucursalId);
         Assert.Equal(2, _stockRepository.Guardados);
+        var ajuste = _movimientos.Items.Last();
+        Assert.Equal(TipoMovimientoStock.Ajuste, ajuste.Tipo);
+        Assert.Equal((20, 3, 17), (ajuste.CantidadAnterior, ajuste.CantidadPosterior, ajuste.Cantidad));
     }
 
     [Fact]

@@ -8,11 +8,16 @@ public class StockService : IStockService
 {
     private readonly IStockRepository _stockRepository;
     private readonly IProductoRepository _productoRepository;
+    private readonly IMovimientoStockRepository _movimientoRepository;
 
-    public StockService(IStockRepository stockRepository, IProductoRepository productoRepository)
+    public StockService(
+        IStockRepository stockRepository,
+        IProductoRepository productoRepository,
+        IMovimientoStockRepository movimientoRepository)
     {
         _stockRepository = stockRepository;
         _productoRepository = productoRepository;
+        _movimientoRepository = movimientoRepository;
     }
 
     public async Task<StockResponse> CrearAsync(StockRequest request, CancellationToken cancellationToken)
@@ -27,9 +32,13 @@ public class StockService : IStockService
             throw new ConflictException(
                 $"El producto '{request.ProductoId}' ya está asignado a la sucursal '{request.SucursalId}'.");
 
-        var stock = Stock.Crear(request.ProductoId, request.SucursalId, request.Cantidad);
+        // El saldo inicial se registra como ajuste desde 0 para que quede en el historial.
+        var stock = Stock.Crear(request.ProductoId, request.SucursalId, 0);
+        var saldoInicial = stock.ActualizarCantidad(request.Cantidad);
 
         await _stockRepository.AgregarAsync(stock, cancellationToken);
+        if (saldoInicial is not null)
+            await _movimientoRepository.AgregarAsync(saldoInicial, cancellationToken);
         await _stockRepository.GuardarCambiosAsync(cancellationToken);
 
         return StockResponse.Desde(stock);
@@ -64,7 +73,9 @@ public class StockService : IStockService
         var stock = await _stockRepository.ObtenerParaActualizarAsync(id, cancellationToken)
             ?? throw StockNoEncontrado(id);
 
-        stock.ActualizarCantidad(request.NuevaCantidad);
+        var ajuste = stock.ActualizarCantidad(request.NuevaCantidad);
+        if (ajuste is not null)
+            await _movimientoRepository.AgregarAsync(ajuste, cancellationToken);
         await _stockRepository.GuardarCambiosAsync(cancellationToken);
 
         return StockResponse.Desde(stock);

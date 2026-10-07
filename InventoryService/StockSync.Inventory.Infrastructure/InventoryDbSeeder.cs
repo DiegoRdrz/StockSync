@@ -53,8 +53,10 @@ public static class InventoryDbSeeder
                     s => s.ProductoId == producto.Id && s.SucursalId == sucursalId, cancellationToken))
                 return;
 
-            var stock = Stock.Crear(producto.Id, sucursalId, saldoInicial);
+            var stock = Stock.Crear(producto.Id, sucursalId, 0);
             context.Stocks.Add(stock);
+            if (stock.ActualizarCantidad(saldoInicial) is { } ajusteInicial)
+                context.MovimientosStock.Add(ajusteInicial);
             if (entrada > 0)
                 context.MovimientosStock.Add(stock.RegistrarMovimiento(TipoMovimientoStock.Entrada, entrada));
             if (salida > 0)

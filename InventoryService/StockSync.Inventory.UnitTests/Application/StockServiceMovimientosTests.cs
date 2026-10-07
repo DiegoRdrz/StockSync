@@ -47,7 +47,7 @@ public partial class StockServiceTests
             await Assert.ThrowsAsync<StockInsuficienteException>(() => service.RegistrarSalidaAsync(stock.Id, new(cantidad), default));
 
         Assert.Equal(5, (await _service.ObtenerPorIdAsync(stock.Id, default)).Cantidad);
-        Assert.Empty(_movimientos.Items);
+        Assert.Equal(TipoMovimientoStock.Ajuste, Assert.Single(_movimientos.Items).Tipo);
         Assert.Equal(1, _stockRepository.Guardados);
     }
 
@@ -69,7 +69,7 @@ public partial class StockServiceTests
 
         await Assert.ThrowsAsync<NotFoundException>(() => CrearServicioMovimientos().RegistrarSalidaAsync(stock.Id, new(1), default));
         Assert.Equal(5, (await _service.ObtenerPorIdAsync(stock.Id, default)).Cantidad);
-        Assert.Empty(_movimientos.Items);
+        Assert.Equal(TipoMovimientoStock.Ajuste, Assert.Single(_movimientos.Items).Tipo);
     }
 
     [Fact]

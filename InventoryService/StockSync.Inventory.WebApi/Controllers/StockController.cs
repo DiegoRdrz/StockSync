@@ -18,7 +18,6 @@ public class StockController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(StockResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<ActionResult<StockResponse>> Crear(StockRequest request, CancellationToken cancellationToken)
     {

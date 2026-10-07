@@ -52,21 +52,21 @@ public partial class StockServiceTests
     }
 
     [Fact]
-    public async Task CrearAsync_ProductoInexistente_LanzaNotFoundExceptionSinGuardar()
+    public async Task CrearAsync_ProductoInexistente_LanzaValidationExceptionSinGuardar()
     {
         var request = new StockRequest(Guid.NewGuid(), Guid.NewGuid(), 20);
 
-        await Assert.ThrowsAsync<NotFoundException>(() => _service.CrearAsync(request, CancellationToken.None));
+        await Assert.ThrowsAsync<ValidationException>(() => _service.CrearAsync(request, CancellationToken.None));
         Assert.Empty(_stockRepository.Stocks);
     }
 
     [Fact]
-    public async Task CrearAsync_ProductoDadoDeBaja_LanzaNotFoundException()
+    public async Task CrearAsync_ProductoDadoDeBaja_LanzaValidationException()
     {
         var producto = CrearProducto();
         producto.Desactivar();
 
-        await Assert.ThrowsAsync<NotFoundException>(
+        await Assert.ThrowsAsync<ValidationException>(
             () => _service.CrearAsync(new StockRequest(producto.Id, Guid.NewGuid(), 20), CancellationToken.None));
     }
 

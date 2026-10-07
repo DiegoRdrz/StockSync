@@ -33,8 +33,8 @@ public class MovimientoStockService : IMovimientoStockService
         var stock = await _stockRepository.ObtenerParaActualizarAsync(stockId, cancellationToken)
             ?? throw StockNoEncontrado(stockId);
 
-        _ = await _productoRepository.ObtenerPorIdAsync(stock.ProductoId, cancellationToken)
-            ?? throw new NotFoundException($"No se encontró el producto activo con id '{stock.ProductoId}'.");
+        if (await _productoRepository.ObtenerPorIdAsync(stock.ProductoId, cancellationToken) is null)
+            throw new ConflictException($"El producto '{stock.ProductoId}' está dado de baja; su stock no admite movimientos.");
 
         var movimiento = stock.RegistrarMovimiento(tipo, request.Cantidad);
         await _movimientoRepository.AgregarAsync(movimiento, cancellationToken);

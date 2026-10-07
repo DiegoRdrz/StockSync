@@ -24,9 +24,12 @@ public class StockService : IStockService
     {
         LanzarSiHayErrores(StockValidator.Validar(request));
 
-        // El repositorio de productos solo devuelve productos activos: uno dado de baja se trata como inexistente.
-        _ = await _productoRepository.ObtenerPorIdAsync(request.ProductoId, cancellationToken)
-            ?? throw new NotFoundException($"No se encontró el producto con id '{request.ProductoId}'.");
+        // Una referencia inválida en el cuerpo es un error de validación (400), no un recurso de la URL inexistente (404).
+        if (await _productoRepository.ObtenerPorIdAsync(request.ProductoId, cancellationToken) is null)
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                [nameof(StockRequest.ProductoId)] = [$"El producto '{request.ProductoId}' no existe o está dado de baja."]
+            });
 
         if (await _stockRepository.ExisteAsync(request.ProductoId, request.SucursalId, cancellationToken))
             throw new ConflictException(

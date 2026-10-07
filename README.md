@@ -2,6 +2,8 @@
 
 API de inventario con .NET 8 y PostgreSQL 15.
 
+![Diagrama del proyecto](Assets/diagrama.png)
+
 ## Ejecutar con Docker (sin instalar .NET ni PostgreSQL)
 
 Con Docker Desktop iniciado, desde la raíz `StockSync` (si estás en

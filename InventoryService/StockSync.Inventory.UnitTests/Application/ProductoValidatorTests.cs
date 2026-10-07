@@ -64,6 +64,19 @@ public class ProductoValidatorTests
     }
 
     [Theory]
+    [InlineData("10.999")]
+    [InlineData("10000000000000000")]
+    public void Validar_PrecioNoRepresentableEnBaseDeDatos_DevuelveError(string precio)
+    {
+        var valor = decimal.Parse(precio, System.Globalization.CultureInfo.InvariantCulture);
+
+        var errores = ProductoValidator.Validar(RequestValido with { PrecioCompra = valor, PrecioVenta = valor });
+
+        Assert.Contains(nameof(ProductoRequest.PrecioCompra), errores.Keys);
+        Assert.Contains(nameof(ProductoRequest.PrecioVenta), errores.Keys);
+    }
+
+    [Theory]
     [InlineData(1, 1)]
     [InlineData(5, ProductoFiltro.TamanoPaginaMaximo)]
     public void Validar_FiltroValido_NoDevuelveErrores(int pagina, int tamanoPagina)

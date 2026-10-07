@@ -16,8 +16,8 @@ public class ProductoConfiguration : IEntityTypeConfiguration<Producto>
         builder.Property(p => p.Nombre).IsRequired().HasMaxLength(Producto.NombreMaxLength);
         builder.Property(p => p.Sku).IsRequired().HasMaxLength(Producto.SkuMaxLength);
         builder.Property(p => p.Descripcion).HasMaxLength(Producto.DescripcionMaxLength);
-        builder.Property(p => p.PrecioCompra).HasPrecision(18, 2);
-        builder.Property(p => p.PrecioVenta).HasPrecision(18, 2);
+        builder.Property(p => p.PrecioCompra).HasPrecision(18, Producto.PrecioDecimales);
+        builder.Property(p => p.PrecioVenta).HasPrecision(18, Producto.PrecioDecimales);
 
         // La baja es lógica: el SKU solo debe ser único entre productos activos.
         builder.HasIndex(p => p.Sku).IsUnique().HasFilter("\"Activo\"");

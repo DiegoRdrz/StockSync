@@ -72,6 +72,25 @@ public class ProductoTests
         Assert.Throws<DomainException>(() => CrearValido(stockMinimo: -1));
     }
 
+    [Theory]
+    [InlineData("10.999")]
+    [InlineData("10000000000000000")]
+    public void Crear_ConPrecioNoRepresentableEnBaseDeDatos_LanzaDomainException(string precio)
+    {
+        var valor = decimal.Parse(precio, System.Globalization.CultureInfo.InvariantCulture);
+
+        Assert.Throws<DomainException>(() => CrearValido(precioCompra: valor));
+        Assert.Throws<DomainException>(() => CrearValido(precioVenta: valor));
+    }
+
+    [Fact]
+    public void Crear_ConPrecioMaximoYDosDecimales_EsValido()
+    {
+        var producto = CrearValido(precioCompra: 10.50m, precioVenta: Producto.PrecioMaximo);
+
+        Assert.Equal(Producto.PrecioMaximo, producto.PrecioVenta);
+    }
+
     [Fact]
     public void Crear_ConPreciosYStockEnCero_EsValido()
     {

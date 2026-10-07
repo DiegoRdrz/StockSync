@@ -23,7 +23,18 @@ public class CategoriaTests
         var categoria = Categoria.Crear(" Herramientas ", "   ");
 
         Assert.Equal("Herramientas", categoria.Nombre);
+        Assert.Equal("HERRAMIENTAS", categoria.NombreNormalizado);
         Assert.Null(categoria.Descripcion);
+    }
+
+    [Fact]
+    public void Actualizar_RecalculaNombreNormalizado()
+    {
+        var categoria = Categoria.Crear("Herramientas", null);
+
+        categoria.Actualizar(" Papelería ", null);
+
+        Assert.Equal("PAPELERÍA", categoria.NombreNormalizado);
     }
 
     [Theory]

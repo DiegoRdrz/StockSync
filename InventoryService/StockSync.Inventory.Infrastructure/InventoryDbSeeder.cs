@@ -26,7 +26,7 @@ public static class InventoryDbSeeder
         {
             var normalizado = Categoria.NormalizarNombre(nombre);
             var categoria = await context.Categorias.FirstOrDefaultAsync(
-                c => c.Activo && c.Nombre.Trim().ToUpper() == normalizado, cancellationToken);
+                c => c.Activo && c.NombreNormalizado == normalizado, cancellationToken);
             if (categoria is not null)
                 return categoria;
 

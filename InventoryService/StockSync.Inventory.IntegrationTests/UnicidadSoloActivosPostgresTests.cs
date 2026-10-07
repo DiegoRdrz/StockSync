@@ -65,7 +65,7 @@ public class UnicidadSoloActivosPostgresTests : PostgresTestBase
         await using (var context = CrearContexto())
         {
             var repo = new CategoriaRepository(context);
-            await repo.AgregarAsync(Categoria.Crear("Chocodsa", null), default);
+            await repo.AgregarAsync(Categoria.Crear(" CHOCODSA ", null), default);
             await Assert.ThrowsAsync<ConflictException>(() => repo.GuardarCambiosAsync(default));
         }
 

@@ -51,7 +51,7 @@ public class CategoriaRepository : ICategoriaRepository
 
     public Task<bool> ExisteNombreAsync(string nombre, Guid? excluirId, CancellationToken cancellationToken) =>
         _context.Categorias.AnyAsync(
-            c => c.Activo && c.Nombre.ToUpper() == nombre && (excluirId == null || c.Id != excluirId),
+            c => c.Activo && c.NombreNormalizado == nombre && (excluirId == null || c.Id != excluirId),
             cancellationToken);
 
     public Task<bool> ExisteActivaAsync(Guid id, CancellationToken cancellationToken) =>

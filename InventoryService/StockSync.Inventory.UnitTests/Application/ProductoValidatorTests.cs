@@ -77,6 +77,7 @@ public class ProductoValidatorTests
     [InlineData(0, 20, nameof(ProductoFiltro.Pagina))]
     [InlineData(1, 0, nameof(ProductoFiltro.TamanoPagina))]
     [InlineData(1, ProductoFiltro.TamanoPaginaMaximo + 1, nameof(ProductoFiltro.TamanoPagina))]
+    [InlineData(int.MaxValue, 20, nameof(ProductoFiltro.Pagina))]
     public void Validar_FiltroInvalido_DevuelveError(int pagina, int tamanoPagina, string campo)
     {
         var filtro = new ProductoFiltro { Pagina = pagina, TamanoPagina = tamanoPagina };

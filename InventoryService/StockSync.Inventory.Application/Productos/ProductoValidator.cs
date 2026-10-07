@@ -46,6 +46,11 @@ public static class ProductoValidator
         if (filtro.TamanoPagina < 1 || filtro.TamanoPagina > ProductoFiltro.TamanoPaginaMaximo)
             Agregar(errores, nameof(filtro.TamanoPagina), $"El tamaño de página debe estar entre 1 y {ProductoFiltro.TamanoPaginaMaximo}.");
 
+        // El desplazamiento (Pagina - 1) * TamanoPagina se calcula en int y no debe desbordarse.
+        if (filtro.Pagina > 0 && filtro.TamanoPagina > 0 &&
+            (long)(filtro.Pagina - 1) * filtro.TamanoPagina > int.MaxValue)
+            Agregar(errores, nameof(filtro.Pagina), "La página solicitada excede el límite permitido.");
+
         return Convertir(errores);
     }
 

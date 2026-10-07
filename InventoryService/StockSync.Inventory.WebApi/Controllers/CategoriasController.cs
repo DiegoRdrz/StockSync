@@ -67,19 +67,11 @@ public class CategoriasController : ControllerBase
     [HttpGet("{id:guid}/productos")]
     [ProducesResponseType(typeof(ResultadoPaginado<ProductoResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ResultadoPaginado<ProductoResponse>>> ListarProductosPorCategoria(
         Guid id,
         [FromQuery] int pagina = 1,
         [FromQuery] int tamanoPagina = 20,
-        CancellationToken cancellationToken = default)
-    {
-        // Validamos que la página y el tamaño sean correctos usando el filtro de producto
-        var filtro = new ProductoFiltro
-        {
-            CategoriaId = id,
-            Pagina = pagina,
-            TamanoPagina = tamanoPagina
-        };
-        return Ok(await _productoService.ListarAsync(filtro, cancellationToken));
-    }
+        CancellationToken cancellationToken = default) =>
+        Ok(await _productoService.ListarPorCategoriaAsync(id, pagina, tamanoPagina, cancellationToken));
 }

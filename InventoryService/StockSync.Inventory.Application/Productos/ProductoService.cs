@@ -64,6 +64,19 @@ public class ProductoService : IProductoService
             total);
     }
 
+    public async Task<ResultadoPaginado<ProductoResponse>> ListarPorCategoriaAsync(
+        Guid categoriaId,
+        int pagina,
+        int tamanoPagina,
+        CancellationToken cancellationToken)
+    {
+        if (!await _categoriaRepository.ExisteActivaAsync(categoriaId, cancellationToken))
+            throw new NotFoundException($"No se encontró la categoría con id '{categoriaId}'.");
+
+        var filtro = new ProductoFiltro { CategoriaId = categoriaId, Pagina = pagina, TamanoPagina = tamanoPagina };
+        return await ListarAsync(filtro, cancellationToken);
+    }
+
     public async Task<ProductoResponse> ActualizarAsync(Guid id, ProductoRequest request, CancellationToken cancellationToken)
     {
         LanzarSiHayErrores(ProductoValidator.Validar(request));

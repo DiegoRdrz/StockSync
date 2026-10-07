@@ -116,6 +116,33 @@ public class ProductoServiceTests
     }
 
     [Fact]
+    public async Task ListarPorCategoriaAsync_CategoriaInexistenteODadaDeBaja_LanzaNotFoundException()
+    {
+        var baja = Categoria.Crear("Herramientas", null);
+        baja.Desactivar();
+        _categoriaRepository.Categorias.Add(baja);
+
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => _service.ListarPorCategoriaAsync(Guid.NewGuid(), 1, 20, CancellationToken.None));
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => _service.ListarPorCategoriaAsync(baja.Id, 1, 20, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ListarPorCategoriaAsync_CategoriaActiva_DevuelveProductosPaginados()
+    {
+        var categoria = Categoria.Crear("Herramientas", null);
+        _categoriaRepository.Categorias.Add(categoria);
+        await _service.CrearAsync(Request() with { CategoriaId = categoria.Id }, CancellationToken.None);
+
+        var resultado = await _service.ListarPorCategoriaAsync(categoria.Id, 1, 20, CancellationToken.None);
+
+        Assert.Equal(1, resultado.Total);
+        await Assert.ThrowsAsync<ValidationException>(
+            () => _service.ListarPorCategoriaAsync(categoria.Id, 0, 20, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task ListarAsync_FiltroInvalido_LanzaValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(

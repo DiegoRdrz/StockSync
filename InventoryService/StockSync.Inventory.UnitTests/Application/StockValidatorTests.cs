@@ -42,6 +42,24 @@ public class StockValidatorTests
         Assert.Empty(StockValidator.Validar(new StockCantidadRequest(10)));
     }
 
+    [Theory]
+    [InlineData(0, 20, nameof(StockFiltro.Pagina))]
+    [InlineData(1, 0, nameof(StockFiltro.TamanoPagina))]
+    [InlineData(1, StockFiltro.TamanoPaginaMaximo + 1, nameof(StockFiltro.TamanoPagina))]
+    [InlineData(int.MaxValue, 20, nameof(StockFiltro.Pagina))]
+    public void Validar_FiltroInvalido_DevuelveError(int pagina, int tamanoPagina, string campo)
+    {
+        var filtro = new StockBajoMinimoFiltro { Pagina = pagina, TamanoPagina = tamanoPagina };
+
+        Assert.Contains(campo, StockValidator.Validar(filtro).Keys);
+    }
+
+    [Fact]
+    public void Validar_FiltroPorDefecto_NoDevuelveErrores()
+    {
+        Assert.Empty(StockValidator.Validar(new StockFiltro()));
+    }
+
     [Fact]
     public void Validar_CantidadRequestNegativo_DevuelveError()
     {

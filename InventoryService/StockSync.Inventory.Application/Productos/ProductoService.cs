@@ -64,6 +64,19 @@ public class ProductoService : IProductoService
             total);
     }
 
+    public async Task<ResultadoPaginado<ProductoResponse>> ListarPorCategoriaAsync(
+        Guid categoriaId,
+        int pagina,
+        int tamanoPagina,
+        CancellationToken cancellationToken)
+    {
+        if (!await _categoriaRepository.ExisteActivaAsync(categoriaId, cancellationToken))
+            throw new NotFoundException($"No se encontró la categoría con id '{categoriaId}'.");
+
+        var filtro = new ProductoFiltro { CategoriaId = categoriaId, Pagina = pagina, TamanoPagina = tamanoPagina };
+        return await ListarAsync(filtro, cancellationToken);
+    }
+
     public async Task<ProductoResponse> ActualizarAsync(Guid id, ProductoRequest request, CancellationToken cancellationToken)
     {
         LanzarSiHayErrores(ProductoValidator.Validar(request));
@@ -92,6 +105,10 @@ public class ProductoService : IProductoService
     {
         var producto = await _productoRepository.ObtenerParaActualizarAsync(id, cancellationToken)
             ?? throw ProductoNoEncontrado(id);
+
+        // Igual que con las categorías: se bloquea para no dejar unidades sin producto que las respalde.
+        if (await _productoRepository.TieneExistenciasAsync(id, cancellationToken))
+            throw new ConflictException("No se puede eliminar el producto porque tiene existencias en una o más sucursales.");
 
         producto.Desactivar();
         await _productoRepository.GuardarCambiosAsync(cancellationToken);

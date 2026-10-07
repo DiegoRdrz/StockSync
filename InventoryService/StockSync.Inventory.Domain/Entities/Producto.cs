@@ -1,3 +1,4 @@
+using StockSync.Inventory.Domain.Common;
 using StockSync.Inventory.Domain.Exceptions;
 
 namespace StockSync.Inventory.Domain.Entities;
@@ -7,6 +8,9 @@ public class Producto
     public const int NombreMaxLength = 150;
     public const int SkuMaxLength = 50;
     public const int DescripcionMaxLength = 500;
+    // Los precios se guardan como numeric(18,2): más decimales se redondearían en silencio y más dígitos desbordan.
+    public const int PrecioDecimales = 2;
+    public const decimal PrecioMaximo = 9_999_999_999_999_999.99m;
 
     public Guid Id { get; private set; }
     public string Nombre { get; private set; } = null!;
@@ -37,7 +41,7 @@ public class Producto
         {
             Id = Guid.NewGuid(),
             Activo = true,
-            FechaCreacion = DateTime.UtcNow
+            FechaCreacion = RelojUtc.Ahora()
         };
         producto.EstablecerDatos(nombre, sku, descripcion, precioCompra, precioVenta, stockMinimo, categoriaId);
         return producto;
@@ -54,18 +58,21 @@ public class Producto
     {
         AsegurarActivo();
         EstablecerDatos(nombre, sku, descripcion, precioCompra, precioVenta, stockMinimo, categoriaId);
-        FechaActualizacion = DateTime.UtcNow;
+        FechaActualizacion = RelojUtc.Ahora();
     }
 
     public void Desactivar()
     {
         AsegurarActivo();
         Activo = false;
-        FechaActualizacion = DateTime.UtcNow;
+        FechaActualizacion = RelojUtc.Ahora();
     }
 
     // El SKU se compara siempre normalizado para que "abc-1" y " ABC-1 " no puedan coexistir.
     public static string NormalizarSku(string sku) => sku.Trim().ToUpperInvariant();
+
+    public static bool EsPrecioRepresentable(decimal precio) =>
+        precio <= PrecioMaximo && decimal.Round(precio, PrecioDecimales) == precio;
 
     private void EstablecerDatos(
         string nombre,
@@ -88,8 +95,12 @@ public class Producto
             throw new DomainException($"La descripción no puede superar {DescripcionMaxLength} caracteres.");
         if (precioCompra < 0)
             throw new DomainException("El precio de compra no puede ser negativo.");
+        if (!EsPrecioRepresentable(precioCompra))
+            throw new DomainException($"El precio de compra admite como máximo {PrecioDecimales} decimales y no puede superar {PrecioMaximo}.");
         if (precioVenta < 0)
             throw new DomainException("El precio de venta no puede ser negativo.");
+        if (!EsPrecioRepresentable(precioVenta))
+            throw new DomainException($"El precio de venta admite como máximo {PrecioDecimales} decimales y no puede superar {PrecioMaximo}.");
         if (stockMinimo < 0)
             throw new DomainException("El stock mínimo no puede ser negativo.");
         if (categoriaId == Guid.Empty)

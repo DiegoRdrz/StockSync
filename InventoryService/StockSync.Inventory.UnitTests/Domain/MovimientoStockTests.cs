@@ -45,6 +45,7 @@ public class MovimientoStockTests
     [InlineData(TipoMovimientoStock.Salida, 0)]
     [InlineData(TipoMovimientoStock.Salida, -1)]
     [InlineData((TipoMovimientoStock)99, 1)]
+    [InlineData(TipoMovimientoStock.Ajuste, 1)]
     public void RegistrarMovimiento_Invalido_NoModifica(TipoMovimientoStock tipo, int cantidad)
     {
         var stock = Stock.Crear(Guid.NewGuid(), Guid.NewGuid(), 10);

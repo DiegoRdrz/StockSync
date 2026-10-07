@@ -92,6 +92,67 @@ public class ProductoServiceTests
     }
 
     [Fact]
+    public async Task EliminarAsync_ConExistencias_LanzaConflictExceptionYSigueActivo()
+    {
+        var creado = await _service.CrearAsync(Request(), CancellationToken.None);
+        _repository.ConExistencias.Add(creado.Id);
+
+        await Assert.ThrowsAsync<ConflictException>(() => _service.EliminarAsync(creado.Id, CancellationToken.None));
+        Assert.True(_repository.Productos.Single().Activo);
+    }
+
+    [Fact]
+    public async Task CrearAsync_SkuDeProductoDadoDeBaja_PermiteReutilizarlo()
+    {
+        var original = await _service.CrearAsync(Request("FER-001"), CancellationToken.None);
+        await _service.EliminarAsync(original.Id, CancellationToken.None);
+
+        var nuevo = await _service.CrearAsync(Request(" fer-001 "), CancellationToken.None);
+
+        Assert.NotEqual(original.Id, nuevo.Id);
+        Assert.Equal("FER-001", nuevo.Sku);
+    }
+
+    [Fact]
+    public async Task ActualizarAsync_SkuDeProductoDadoDeBaja_EsValido()
+    {
+        var baja = await _service.CrearAsync(Request("FER-001"), CancellationToken.None);
+        await _service.EliminarAsync(baja.Id, CancellationToken.None);
+        var otro = await _service.CrearAsync(Request("FER-002"), CancellationToken.None);
+
+        var actualizado = await _service.ActualizarAsync(otro.Id, Request("FER-001"), CancellationToken.None);
+
+        Assert.Equal("FER-001", actualizado.Sku);
+    }
+
+    [Fact]
+    public async Task ListarPorCategoriaAsync_CategoriaInexistenteODadaDeBaja_LanzaNotFoundException()
+    {
+        var baja = Categoria.Crear("Herramientas", null);
+        baja.Desactivar();
+        _categoriaRepository.Categorias.Add(baja);
+
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => _service.ListarPorCategoriaAsync(Guid.NewGuid(), 1, 20, CancellationToken.None));
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => _service.ListarPorCategoriaAsync(baja.Id, 1, 20, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task ListarPorCategoriaAsync_CategoriaActiva_DevuelveProductosPaginados()
+    {
+        var categoria = Categoria.Crear("Herramientas", null);
+        _categoriaRepository.Categorias.Add(categoria);
+        await _service.CrearAsync(Request() with { CategoriaId = categoria.Id }, CancellationToken.None);
+
+        var resultado = await _service.ListarPorCategoriaAsync(categoria.Id, 1, 20, CancellationToken.None);
+
+        Assert.Equal(1, resultado.Total);
+        await Assert.ThrowsAsync<ValidationException>(
+            () => _service.ListarPorCategoriaAsync(categoria.Id, 0, 20, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task ListarAsync_FiltroInvalido_LanzaValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(
@@ -138,7 +199,12 @@ public class ProductoServiceTests
         }
 
         public Task<bool> ExisteSkuAsync(string sku, Guid? excluirId, CancellationToken cancellationToken) =>
-            Task.FromResult(Productos.Any(p => p.Sku == sku && p.Id != excluirId));
+            Task.FromResult(Productos.Any(p => p.Activo && p.Sku == sku && p.Id != excluirId));
+
+        public HashSet<Guid> ConExistencias { get; } = [];
+
+        public Task<bool> TieneExistenciasAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(ConExistencias.Contains(id));
 
         public Task AgregarAsync(Producto producto, CancellationToken cancellationToken)
         {

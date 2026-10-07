@@ -26,7 +26,7 @@ public static class InventoryDbSeeder
         {
             var normalizado = Categoria.NormalizarNombre(nombre);
             var categoria = await context.Categorias.FirstOrDefaultAsync(
-                c => c.Nombre.Trim().ToUpper() == normalizado, cancellationToken);
+                c => c.Activo && c.NombreNormalizado == normalizado, cancellationToken);
             if (categoria is not null)
                 return categoria;
 
@@ -38,7 +38,10 @@ public static class InventoryDbSeeder
         async Task AgregarProductoYStockAsync(string nombre, string sku, decimal compra, decimal venta,
             int minimo, Guid categoriaId, Guid sucursalId, int saldoInicial, int entrada, int salida)
         {
-            var producto = await context.Productos.SingleOrDefaultAsync(p => p.Sku == sku, cancellationToken);
+            // Un SKU puede repetirse entre bajas y un activo; se prioriza el activo.
+            var producto = await context.Productos
+                .OrderByDescending(p => p.Activo)
+                .FirstOrDefaultAsync(p => p.Sku == sku, cancellationToken);
             if (producto is null)
             {
                 producto = Producto.Crear(nombre, sku, "Producto para pruebas", compra, venta, minimo, categoriaId);
@@ -50,8 +53,10 @@ public static class InventoryDbSeeder
                     s => s.ProductoId == producto.Id && s.SucursalId == sucursalId, cancellationToken))
                 return;
 
-            var stock = Stock.Crear(producto.Id, sucursalId, saldoInicial);
+            var stock = Stock.Crear(producto.Id, sucursalId, 0);
             context.Stocks.Add(stock);
+            if (stock.ActualizarCantidad(saldoInicial) is { } ajusteInicial)
+                context.MovimientosStock.Add(ajusteInicial);
             if (entrada > 0)
                 context.MovimientosStock.Add(stock.RegistrarMovimiento(TipoMovimientoStock.Entrada, entrada));
             if (salida > 0)

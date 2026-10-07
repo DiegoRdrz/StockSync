@@ -72,6 +72,25 @@ public class ProductoTests
         Assert.Throws<DomainException>(() => CrearValido(stockMinimo: -1));
     }
 
+    [Theory]
+    [InlineData("10.999")]
+    [InlineData("10000000000000000")]
+    public void Crear_ConPrecioNoRepresentableEnBaseDeDatos_LanzaDomainException(string precio)
+    {
+        var valor = decimal.Parse(precio, System.Globalization.CultureInfo.InvariantCulture);
+
+        Assert.Throws<DomainException>(() => CrearValido(precioCompra: valor));
+        Assert.Throws<DomainException>(() => CrearValido(precioVenta: valor));
+    }
+
+    [Fact]
+    public void Crear_ConPrecioMaximoYDosDecimales_EsValido()
+    {
+        var producto = CrearValido(precioCompra: 10.50m, precioVenta: Producto.PrecioMaximo);
+
+        Assert.Equal(Producto.PrecioMaximo, producto.PrecioVenta);
+    }
+
     [Fact]
     public void Crear_ConPreciosYStockEnCero_EsValido()
     {
@@ -107,6 +126,21 @@ public class ProductoTests
         Assert.Throws<DomainException>(() => producto.Actualizar("Otro", "FER-001", null, -5m, 15m, 5, null));
         Assert.Equal("Martillo", producto.Nombre);
         Assert.Equal(10m, producto.PrecioCompra);
+    }
+
+    // Con varias iteraciones, un UtcNow que caiga justo en un microsegundo exacto no oculta el fallo.
+    [Fact]
+    public void Fechas_SeTruncanAMicrosegundosComoEnPostgreSql()
+    {
+        for (var i = 0; i < 20; i++)
+        {
+            var producto = CrearValido();
+            producto.Actualizar("Martillo grande", "FER-001", null, 1m, 2m, 0, null);
+
+            Assert.Equal(0, producto.FechaCreacion.Ticks % TimeSpan.TicksPerMicrosecond);
+            Assert.Equal(0, producto.FechaActualizacion!.Value.Ticks % TimeSpan.TicksPerMicrosecond);
+            Assert.Equal(DateTimeKind.Utc, producto.FechaActualizacion.Value.Kind);
+        }
     }
 
     [Fact]

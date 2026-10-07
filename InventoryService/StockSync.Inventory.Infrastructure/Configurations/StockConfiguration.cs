@@ -24,8 +24,11 @@ public class StockConfiguration : IEntityTypeConfiguration<Stock>
             .HasForeignKey(s => s.ProductoId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Property<Guid>(InventoryDbContext.TenantIdPropiedad);
+
         // SucursalId es el identificador de una sucursal de otro servicio: sin FK ni entidad Sucursal.
+        // El producto ya pertenece a un único tenant, así que la unicidad producto-sucursal no lo necesita.
         builder.HasIndex(s => new { s.ProductoId, s.SucursalId }).IsUnique();
-        builder.HasIndex(s => s.SucursalId);
+        builder.HasIndex(InventoryDbContext.TenantIdPropiedad, nameof(Stock.SucursalId));
     }
 }

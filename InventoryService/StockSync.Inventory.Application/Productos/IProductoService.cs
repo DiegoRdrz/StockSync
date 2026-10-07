@@ -10,6 +10,12 @@ public interface IProductoService
 
     Task<ResultadoPaginado<ProductoResponse>> ListarAsync(ProductoFiltro filtro, CancellationToken cancellationToken);
 
+    Task<ResultadoPaginado<ProductoResponse>> ListarPorCategoriaAsync(
+        Guid categoriaId,
+        int pagina,
+        int tamanoPagina,
+        CancellationToken cancellationToken);
+
     Task<ProductoResponse> ActualizarAsync(Guid id, ProductoRequest request, CancellationToken cancellationToken);
 
     Task EliminarAsync(Guid id, CancellationToken cancellationToken);

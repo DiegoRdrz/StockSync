@@ -18,6 +18,8 @@ public interface IProductoRepository
 
     Task<bool> ExisteSkuAsync(string sku, Guid? excluirId, CancellationToken cancellationToken);
 
+    Task<bool> TieneExistenciasAsync(Guid id, CancellationToken cancellationToken);
+
     Task AgregarAsync(Producto producto, CancellationToken cancellationToken);
 
     Task GuardarCambiosAsync(CancellationToken cancellationToken);

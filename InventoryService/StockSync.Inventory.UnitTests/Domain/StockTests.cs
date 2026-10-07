@@ -74,6 +74,33 @@ public class StockTests
         Assert.Equal(0, stock.Cantidad);
     }
 
+    [Theory]
+    [InlineData(20, 35, 15)]
+    [InlineData(20, 5, 15)]
+    [InlineData(0, 12, 12)]
+    public void ActualizarCantidad_RegistraAjusteConSaldosAnteriorYPosterior(int inicial, int nueva, int diferencia)
+    {
+        var stock = CrearValido(cantidad: inicial);
+
+        var ajuste = stock.ActualizarCantidad(nueva);
+
+        Assert.NotNull(ajuste);
+        Assert.Equal(TipoMovimientoStock.Ajuste, ajuste.Tipo);
+        Assert.Equal(stock.Id, ajuste.StockId);
+        Assert.Equal(diferencia, ajuste.Cantidad);
+        Assert.Equal(inicial, ajuste.CantidadAnterior);
+        Assert.Equal(nueva, ajuste.CantidadPosterior);
+    }
+
+    [Fact]
+    public void ActualizarCantidad_SinCambio_NoRegistraAjuste()
+    {
+        var stock = CrearValido(cantidad: 20);
+
+        Assert.Null(stock.ActualizarCantidad(20));
+        Assert.Equal(20, stock.Cantidad);
+    }
+
     [Fact]
     public void ActualizarCantidad_ConCantidadNegativa_LanzaDomainExceptionYNoModifica()
     {

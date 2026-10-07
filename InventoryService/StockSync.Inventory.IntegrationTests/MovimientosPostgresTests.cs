@@ -66,15 +66,15 @@ public class MovimientosPostgresTests : IAsyncLifetime
         martillo.Desactivar();
         await context.SaveChangesAsync();
         var service = new MovimientoStockService(new StockRepository(context), new ProductoRepository(context),
-            new MovimientoStockRepository(context));
+            new MovimientoStockRepository(context), new UnidadDeTrabajo(context));
 
         var pagina1 = await service.ListarGeneralAsync(1, default);
         var pagina2 = await service.ListarGeneralAsync(2, default);
         Assert.Equal(10, pagina1.Items.Count);
-        Assert.Equal(6, pagina2.Items.Count);
+        Assert.Equal(7, pagina2.Items.Count);
         Assert.Equal(10, pagina1.TamanoPagina);
-        Assert.Equal(16, pagina1.Total);
-        Assert.Equal(16, pagina2.Total);
+        Assert.Equal(17, pagina1.Total);
+        Assert.Equal(17, pagina2.Total);
         Assert.Equal(2, pagina2.TotalPaginas);
         var esperados = await context.MovimientosStock.OrderByDescending(m => m.Fecha)
             .ThenByDescending(m => m.Id).Select(m => m.Id).ToListAsync();
@@ -103,7 +103,7 @@ public class MovimientosPostgresTests : IAsyncLifetime
             Assert.Equal(2, await context.Categorias.CountAsync());
             Assert.Equal(4, await context.Productos.CountAsync()); // Incluye el producto de la fixture.
             Assert.Equal(4, await context.Stocks.CountAsync());
-            Assert.Equal(4, await context.MovimientosStock.CountAsync());
+            Assert.Equal(5, await context.MovimientosStock.CountAsync());
             var martillo = await context.Productos.SingleAsync(p => p.Sku == "DEMO-HER-001");
             martilloId = martillo.Id;
             var stock = await context.Stocks.SingleAsync(s => s.ProductoId == martilloId);
@@ -121,7 +121,7 @@ public class MovimientosPostgresTests : IAsyncLifetime
         Assert.Equal(2, await repeticion.Categorias.CountAsync());
         Assert.Equal(4, await repeticion.Productos.CountAsync());
         Assert.Equal(4, await repeticion.Stocks.CountAsync());
-        Assert.Equal(5, await repeticion.MovimientosStock.CountAsync());
+        Assert.Equal(6, await repeticion.MovimientosStock.CountAsync());
         Assert.Equal(5, (await repeticion.Stocks.SingleAsync(s => s.Id == stockId)).Cantidad);
         Assert.False((await repeticion.Productos.SingleAsync(p => p.Id == martilloId)).Activo);
     }

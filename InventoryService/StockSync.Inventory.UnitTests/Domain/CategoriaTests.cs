@@ -23,7 +23,18 @@ public class CategoriaTests
         var categoria = Categoria.Crear(" Herramientas ", "   ");
 
         Assert.Equal("Herramientas", categoria.Nombre);
+        Assert.Equal("HERRAMIENTAS", categoria.NombreNormalizado);
         Assert.Null(categoria.Descripcion);
+    }
+
+    [Fact]
+    public void Actualizar_RecalculaNombreNormalizado()
+    {
+        var categoria = Categoria.Crear("Herramientas", null);
+
+        categoria.Actualizar(" Papelería ", null);
+
+        Assert.Equal("PAPELERÍA", categoria.NombreNormalizado);
     }
 
     [Theory]
@@ -51,6 +62,21 @@ public class CategoriaTests
         Assert.Equal("Otras herramientas", categoria.Nombre);
         Assert.Equal("Nueva descripción", categoria.Descripcion);
         Assert.NotNull(categoria.FechaActualizacion);
+    }
+
+    // Con varias iteraciones, un UtcNow que caiga justo en un microsegundo exacto no oculta el fallo.
+    [Fact]
+    public void Fechas_SeTruncanAMicrosegundosComoEnPostgreSql()
+    {
+        for (var i = 0; i < 20; i++)
+        {
+            var categoria = Categoria.Crear("Herramientas", null);
+            categoria.Desactivar();
+
+            Assert.Equal(0, categoria.FechaCreacion.Ticks % TimeSpan.TicksPerMicrosecond);
+            Assert.Equal(0, categoria.FechaActualizacion!.Value.Ticks % TimeSpan.TicksPerMicrosecond);
+            Assert.Equal(DateTimeKind.Utc, categoria.FechaCreacion.Kind);
+        }
     }
 
     [Fact]

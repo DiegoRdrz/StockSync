@@ -23,9 +23,13 @@ public static class ProductoValidator
 
         if (request.PrecioCompra < 0)
             Agregar(errores, nameof(request.PrecioCompra), "El precio de compra no puede ser negativo.");
+        else if (!Producto.EsPrecioRepresentable(request.PrecioCompra))
+            Agregar(errores, nameof(request.PrecioCompra), $"El precio de compra admite como máximo {Producto.PrecioDecimales} decimales y no puede superar {Producto.PrecioMaximo}.");
 
         if (request.PrecioVenta < 0)
             Agregar(errores, nameof(request.PrecioVenta), "El precio de venta no puede ser negativo.");
+        else if (!Producto.EsPrecioRepresentable(request.PrecioVenta))
+            Agregar(errores, nameof(request.PrecioVenta), $"El precio de venta admite como máximo {Producto.PrecioDecimales} decimales y no puede superar {Producto.PrecioMaximo}.");
 
         if (request.StockMinimo < 0)
             Agregar(errores, nameof(request.StockMinimo), "El stock mínimo no puede ser negativo.");
@@ -45,6 +49,11 @@ public static class ProductoValidator
 
         if (filtro.TamanoPagina < 1 || filtro.TamanoPagina > ProductoFiltro.TamanoPaginaMaximo)
             Agregar(errores, nameof(filtro.TamanoPagina), $"El tamaño de página debe estar entre 1 y {ProductoFiltro.TamanoPaginaMaximo}.");
+
+        // El desplazamiento (Pagina - 1) * TamanoPagina se calcula en int y no debe desbordarse.
+        if (filtro.Pagina > 0 && filtro.TamanoPagina > 0 &&
+            (long)(filtro.Pagina - 1) * filtro.TamanoPagina > int.MaxValue)
+            Agregar(errores, nameof(filtro.Pagina), "La página solicitada excede el límite permitido.");
 
         return Convertir(errores);
     }

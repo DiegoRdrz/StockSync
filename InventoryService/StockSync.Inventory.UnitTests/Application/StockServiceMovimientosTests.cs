@@ -11,7 +11,7 @@ namespace StockSync.Inventory.UnitTests.Application;
 public partial class StockServiceTests
 {
     private readonly FakeMovimientoRepository _movimientos = new();
-    private MovimientoStockService CrearServicioMovimientos() => new(_stockRepository, _productoRepository, _movimientos);
+    private MovimientoStockService CrearServicioMovimientos() => new(_stockRepository, _productoRepository, _movimientos, _unidadDeTrabajo);
 
     [Fact]
     public async Task Movimientos_EntradaYSalida_GuardanSaldoEHistorial()
@@ -47,7 +47,7 @@ public partial class StockServiceTests
             await Assert.ThrowsAsync<StockInsuficienteException>(() => service.RegistrarSalidaAsync(stock.Id, new(cantidad), default));
 
         Assert.Equal(5, (await _service.ObtenerPorIdAsync(stock.Id, default)).Cantidad);
-        Assert.Empty(_movimientos.Items);
+        Assert.Equal(TipoMovimientoStock.Ajuste, Assert.Single(_movimientos.Items).Tipo);
         Assert.Equal(1, _stockRepository.Guardados);
     }
 
@@ -67,9 +67,9 @@ public partial class StockServiceTests
         var stock = await _service.CrearAsync(new StockRequest(producto.Id, Guid.NewGuid(), 5), default);
         producto.Desactivar();
 
-        await Assert.ThrowsAsync<NotFoundException>(() => CrearServicioMovimientos().RegistrarSalidaAsync(stock.Id, new(1), default));
+        await Assert.ThrowsAsync<ConflictException>(() => CrearServicioMovimientos().RegistrarSalidaAsync(stock.Id, new(1), default));
         Assert.Equal(5, (await _service.ObtenerPorIdAsync(stock.Id, default)).Cantidad);
-        Assert.Empty(_movimientos.Items);
+        Assert.Equal(TipoMovimientoStock.Ajuste, Assert.Single(_movimientos.Items).Tipo);
     }
 
     [Fact]

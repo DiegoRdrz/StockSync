@@ -1,0 +1,7 @@
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+**/TestResults/
+StockSync.Inventory.UnitTests/
+StockSync.Inventory.IntegrationTests/

@@ -60,11 +60,14 @@ public class ProductoRepository : IProductoRepository
         return (items, total);
     }
 
-    // Incluye productos dados de baja: el SKU queda reservado para no romper el historial de movimientos.
+    // Solo productos activos: el historial de movimientos se vincula por ProductoId, no por SKU.
     public Task<bool> ExisteSkuAsync(string sku, Guid? excluirId, CancellationToken cancellationToken) =>
         _context.Productos.AnyAsync(
-            p => p.Sku == sku && (excluirId == null || p.Id != excluirId),
+            p => p.Activo && p.Sku == sku && (excluirId == null || p.Id != excluirId),
             cancellationToken);
+
+    public Task<bool> TieneExistenciasAsync(Guid id, CancellationToken cancellationToken) =>
+        _context.Stocks.AnyAsync(s => s.ProductoId == id && s.Cantidad > 0, cancellationToken);
 
     public async Task AgregarAsync(Producto producto, CancellationToken cancellationToken) =>
         await _context.Productos.AddAsync(producto, cancellationToken);

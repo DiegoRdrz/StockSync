@@ -16,8 +16,11 @@ public class CategoriaConfiguration : IEntityTypeConfiguration<Categoria>
         builder.Property(c => c.Nombre).IsRequired().HasMaxLength(Categoria.NombreMaxLength);
         builder.Property(c => c.NombreNormalizado).IsRequired().HasMaxLength(Categoria.NombreMaxLength);
         builder.Property(c => c.Descripcion).HasMaxLength(Categoria.DescripcionMaxLength);
+        builder.Property<Guid>(InventoryDbContext.TenantIdPropiedad);
 
-        // La baja es lógica: el nombre solo debe ser único entre categorías activas.
-        builder.HasIndex(c => c.NombreNormalizado).IsUnique().HasFilter("\"Activo\"");
+        // La baja es lógica: el nombre solo debe ser único entre las categorías activas del tenant.
+        builder.HasIndex(InventoryDbContext.TenantIdPropiedad, nameof(Categoria.NombreNormalizado))
+            .IsUnique()
+            .HasFilter("\"Activo\"");
     }
 }

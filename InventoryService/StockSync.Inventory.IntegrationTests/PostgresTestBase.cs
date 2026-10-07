@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Infrastructure;
 
 namespace StockSync.Inventory.IntegrationTests;
@@ -31,6 +32,12 @@ public abstract class PostgresTestBase : IAsyncLifetime
         await command.ExecuteNonQueryAsync();
     }
 
-    protected InventoryDbContext CrearContexto() => new(
-        new DbContextOptionsBuilder<InventoryDbContext>().UseNpgsql(_connectionString).Options);
+    protected InventoryDbContext CrearContexto() => new(Opciones());
+
+    protected InventoryDbContext CrearContexto(Guid tenantId) => new(Opciones(), new TenantFijo(tenantId));
+
+    private DbContextOptions<InventoryDbContext> Opciones() =>
+        new DbContextOptionsBuilder<InventoryDbContext>().UseNpgsql(_connectionString).Options;
+
+    private sealed record TenantFijo(Guid TenantId) : ITenantActual;
 }

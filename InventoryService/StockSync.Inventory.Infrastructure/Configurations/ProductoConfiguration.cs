@@ -19,8 +19,12 @@ public class ProductoConfiguration : IEntityTypeConfiguration<Producto>
         builder.Property(p => p.PrecioCompra).HasPrecision(18, Producto.PrecioDecimales);
         builder.Property(p => p.PrecioVenta).HasPrecision(18, Producto.PrecioDecimales);
 
-        // La baja es lógica: el SKU solo debe ser único entre productos activos.
-        builder.HasIndex(p => p.Sku).IsUnique().HasFilter("\"Activo\"");
+        builder.Property<Guid>(InventoryDbContext.TenantIdPropiedad);
+
+        // La baja es lógica: el SKU solo debe ser único entre los productos activos del tenant.
+        builder.HasIndex(InventoryDbContext.TenantIdPropiedad, nameof(Producto.Sku))
+            .IsUnique()
+            .HasFilter("\"Activo\"");
         builder.HasIndex(p => p.CategoriaId);
 
         builder.HasOne<Categoria>()

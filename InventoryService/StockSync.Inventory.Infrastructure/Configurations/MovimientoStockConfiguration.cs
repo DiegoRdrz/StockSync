@@ -19,5 +19,8 @@ public class MovimientoStockConfiguration : IEntityTypeConfiguration<MovimientoS
         builder.Property(m => m.Tipo).HasConversion<string>().HasMaxLength(10);
         builder.HasOne<Stock>().WithMany().HasForeignKey(m => m.StockId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(m => new { m.StockId, m.Fecha, m.Id });
+        builder.Property<Guid>(InventoryDbContext.TenantIdPropiedad);
+        // Sirve al listado general de movimientos, que se ordena por fecha dentro de cada tenant.
+        builder.HasIndex(InventoryDbContext.TenantIdPropiedad, nameof(MovimientoStock.Fecha), nameof(MovimientoStock.Id));
     }
 }

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using StockSync.Inventory.Application.Categorias;
+using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Application.Movimientos;
 using StockSync.Inventory.Application.Productos;
 using StockSync.Inventory.Application.Stocks;
@@ -7,11 +8,14 @@ using StockSync.Inventory.Domain.Repositories;
 using StockSync.Inventory.Infrastructure;
 using StockSync.Inventory.Infrastructure.Repositories;
 using StockSync.Inventory.WebApi.ExceptionHandling;
+using StockSync.Inventory.WebApi.Multitenencia;
 
 var ejecutarSemilla = args.Contains("--seed");
 var ejecutarMigraciones = args.Contains("--migrate");
 var builder = WebApplication.CreateBuilder(args.Where(arg => arg is not "--seed" and not "--migrate").ToArray());
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantActual, TenantActualHttp>();
 builder.Services.AddDbContext<InventoryDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -30,7 +34,7 @@ builder.Services.AddControllers();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options => options.OperationFilter<EncabezadoTenantOperationFilter>());
 
 var app = builder.Build();
 
@@ -65,6 +69,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseMiddleware<ResolucionTenantMiddleware>();
 app.MapControllers();
 
 app.Run();

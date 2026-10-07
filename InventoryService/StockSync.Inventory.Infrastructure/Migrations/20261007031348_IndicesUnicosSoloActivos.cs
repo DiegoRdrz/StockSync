@@ -4,10 +4,8 @@
 
 namespace StockSync.Inventory.Infrastructure.Migrations
 {
-    /// <inheritdoc />
     public partial class IndicesUnicosSoloActivos : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(
@@ -33,7 +31,6 @@ namespace StockSync.Inventory.Infrastructure.Migrations
                 filter: "\"Activo\"");
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropIndex(

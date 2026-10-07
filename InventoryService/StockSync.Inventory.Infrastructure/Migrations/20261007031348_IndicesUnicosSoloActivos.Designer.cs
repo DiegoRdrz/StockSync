@@ -15,7 +15,6 @@ namespace StockSync.Inventory.Infrastructure.Migrations
     [Migration("20261007031348_IndicesUnicosSoloActivos")]
     partial class IndicesUnicosSoloActivos
     {
-        /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618

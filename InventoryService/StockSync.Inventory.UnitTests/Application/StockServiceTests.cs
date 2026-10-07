@@ -217,7 +217,7 @@ public partial class StockServiceTests
     public async Task EliminarAsync_EliminaLaAsignacionPeroNoElProducto()
     {
         var producto = CrearProducto();
-        var creado = await _service.CrearAsync(new StockRequest(producto.Id, Guid.NewGuid(), 20), CancellationToken.None);
+        var creado = await _service.CrearAsync(new StockRequest(producto.Id, Guid.NewGuid(), 0), CancellationToken.None);
 
         await _service.EliminarAsync(creado.Id, CancellationToken.None);
 
@@ -226,6 +226,29 @@ public partial class StockServiceTests
         Assert.Single(_productoRepository.Productos);
         await Assert.ThrowsAsync<NotFoundException>(
             () => _service.ObtenerPorIdAsync(creado.Id, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task EliminarAsync_ConExistencias_LanzaConflictExceptionSinEliminar()
+    {
+        var producto = CrearProducto();
+        var creado = await _service.CrearAsync(new StockRequest(producto.Id, Guid.NewGuid(), 5), CancellationToken.None);
+
+        await Assert.ThrowsAsync<ConflictException>(() => _service.EliminarAsync(creado.Id, CancellationToken.None));
+        Assert.Single(_stockRepository.Stocks);
+    }
+
+    [Fact]
+    public async Task ActualizarCantidadAsync_ProductoDadoDeBaja_LanzaConflictExceptionSinModificar()
+    {
+        var producto = CrearProducto();
+        var creado = await _service.CrearAsync(new StockRequest(producto.Id, Guid.NewGuid(), 5), CancellationToken.None);
+        producto.Desactivar();
+
+        await Assert.ThrowsAsync<ConflictException>(
+            () => _service.ActualizarCantidadAsync(creado.Id, new StockCantidadRequest(0), CancellationToken.None));
+        Assert.Equal(5, _stockRepository.Stocks.Single().Cantidad);
+        Assert.Single(_movimientos.Items);
     }
 
     [Fact]
@@ -240,7 +263,7 @@ public partial class StockServiceTests
     {
         var producto = CrearProducto();
         var sucursalId = Guid.NewGuid();
-        var creado = await _service.CrearAsync(new StockRequest(producto.Id, sucursalId, 20), CancellationToken.None);
+        var creado = await _service.CrearAsync(new StockRequest(producto.Id, sucursalId, 0), CancellationToken.None);
         await _service.EliminarAsync(creado.Id, CancellationToken.None);
 
         var nuevo = await _service.CrearAsync(new StockRequest(producto.Id, sucursalId, 7), CancellationToken.None);
@@ -306,6 +329,9 @@ public partial class StockServiceTests
             throw new NotSupportedException();
 
         public Task<bool> ExisteSkuAsync(string sku, Guid? excluirId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<bool> TieneExistenciasAsync(Guid id, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public Task AgregarAsync(Producto producto, CancellationToken cancellationToken) =>

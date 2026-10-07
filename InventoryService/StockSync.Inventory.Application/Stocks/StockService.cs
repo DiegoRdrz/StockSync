@@ -72,6 +72,7 @@ public class StockService : IStockService
 
         var stock = await _stockRepository.ObtenerParaActualizarAsync(id, cancellationToken)
             ?? throw StockNoEncontrado(id);
+        await AsegurarProductoActivoAsync(stock.ProductoId, cancellationToken);
 
         var ajuste = stock.ActualizarCantidad(request.NuevaCantidad);
         if (ajuste is not null)
@@ -87,8 +88,18 @@ public class StockService : IStockService
         var stock = await _stockRepository.ObtenerParaActualizarAsync(id, cancellationToken)
             ?? throw StockNoEncontrado(id);
 
+        // Borrar una asignación con unidades las haría desaparecer sin ningún movimiento que lo explique.
+        if (stock.Cantidad > 0)
+            throw new ConflictException("No se puede eliminar la asignación porque tiene existencias.");
+
         _stockRepository.Eliminar(stock);
         await _stockRepository.GuardarCambiosAsync(cancellationToken);
+    }
+
+    private async Task AsegurarProductoActivoAsync(Guid productoId, CancellationToken cancellationToken)
+    {
+        if (await _productoRepository.ObtenerPorIdAsync(productoId, cancellationToken) is null)
+            throw new ConflictException($"El producto '{productoId}' está dado de baja; su stock no admite cambios.");
     }
 
     private static void LanzarSiHayErrores(Dictionary<string, string[]> errores)

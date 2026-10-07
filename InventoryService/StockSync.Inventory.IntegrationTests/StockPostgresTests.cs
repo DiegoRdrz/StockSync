@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using StockSync.Inventory.Application.Common.Exceptions;
 using StockSync.Inventory.Application.Movimientos;
+using StockSync.Inventory.Application.Productos;
 using StockSync.Inventory.Application.Stocks;
 using StockSync.Inventory.Domain.Entities;
 using StockSync.Inventory.Infrastructure;
@@ -45,5 +47,26 @@ public class StockPostgresTests : PostgresTestBase
             movimientos.Select(m => m.Tipo));
         Assert.Equal(20, saldo);
         Assert.Equal(saldo, movimientos.Sum(m => m.CantidadPosterior - m.CantidadAnterior));
+    }
+
+    [PostgreSqlFact]
+    public async Task EliminarProductoYStock_SoloSinExistencias()
+    {
+        var producto = await CrearProductoAsync();
+        await using var context = CrearContexto();
+        var productoService = new ProductoService(new ProductoRepository(context), new CategoriaRepository(context));
+        var stockService = CrearStockService(context);
+        var conExistencias = await stockService.CrearAsync(new(producto.Id, Guid.NewGuid(), 5), default);
+        var sinExistencias = await stockService.CrearAsync(new(producto.Id, Guid.NewGuid(), 0), default);
+
+        await Assert.ThrowsAsync<ConflictException>(() => productoService.EliminarAsync(producto.Id, default));
+        await Assert.ThrowsAsync<ConflictException>(() => stockService.EliminarAsync(conExistencias.Id, default));
+        await stockService.EliminarAsync(sinExistencias.Id, default);
+        await CrearMovimientoService(context).RegistrarSalidaAsync(conExistencias.Id, new(5), default);
+        await productoService.EliminarAsync(producto.Id, default);
+
+        await using var verificacion = CrearContexto();
+        Assert.False((await verificacion.Productos.SingleAsync()).Activo);
+        Assert.Equal(conExistencias.Id, (await verificacion.Stocks.SingleAsync()).Id);
     }
 }

@@ -66,6 +66,9 @@ public class ProductoRepository : IProductoRepository
             p => p.Activo && p.Sku == sku && (excluirId == null || p.Id != excluirId),
             cancellationToken);
 
+    public Task<bool> TieneExistenciasAsync(Guid id, CancellationToken cancellationToken) =>
+        _context.Stocks.AnyAsync(s => s.ProductoId == id && s.Cantidad > 0, cancellationToken);
+
     public async Task AgregarAsync(Producto producto, CancellationToken cancellationToken) =>
         await _context.Productos.AddAsync(producto, cancellationToken);
 

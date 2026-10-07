@@ -54,6 +54,7 @@ public class ProductosController : ControllerBase
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Eliminar(Guid id, CancellationToken cancellationToken)
     {
         await _productoService.EliminarAsync(id, cancellationToken);

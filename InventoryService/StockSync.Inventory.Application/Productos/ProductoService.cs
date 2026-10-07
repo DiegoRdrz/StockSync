@@ -106,6 +106,10 @@ public class ProductoService : IProductoService
         var producto = await _productoRepository.ObtenerParaActualizarAsync(id, cancellationToken)
             ?? throw ProductoNoEncontrado(id);
 
+        // Igual que con las categorías: se bloquea para no dejar unidades sin producto que las respalde.
+        if (await _productoRepository.TieneExistenciasAsync(id, cancellationToken))
+            throw new ConflictException("No se puede eliminar el producto porque tiene existencias en una o más sucursales.");
+
         producto.Desactivar();
         await _productoRepository.GuardarCambiosAsync(cancellationToken);
     }

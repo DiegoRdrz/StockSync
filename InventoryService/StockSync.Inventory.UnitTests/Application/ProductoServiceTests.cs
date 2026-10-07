@@ -92,6 +92,16 @@ public class ProductoServiceTests
     }
 
     [Fact]
+    public async Task EliminarAsync_ConExistencias_LanzaConflictExceptionYSigueActivo()
+    {
+        var creado = await _service.CrearAsync(Request(), CancellationToken.None);
+        _repository.ConExistencias.Add(creado.Id);
+
+        await Assert.ThrowsAsync<ConflictException>(() => _service.EliminarAsync(creado.Id, CancellationToken.None));
+        Assert.True(_repository.Productos.Single().Activo);
+    }
+
+    [Fact]
     public async Task CrearAsync_SkuDeProductoDadoDeBaja_PermiteReutilizarlo()
     {
         var original = await _service.CrearAsync(Request("FER-001"), CancellationToken.None);
@@ -190,6 +200,11 @@ public class ProductoServiceTests
 
         public Task<bool> ExisteSkuAsync(string sku, Guid? excluirId, CancellationToken cancellationToken) =>
             Task.FromResult(Productos.Any(p => p.Activo && p.Sku == sku && p.Id != excluirId));
+
+        public HashSet<Guid> ConExistencias { get; } = [];
+
+        public Task<bool> TieneExistenciasAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(ConExistencias.Contains(id));
 
         public Task AgregarAsync(Producto producto, CancellationToken cancellationToken)
         {

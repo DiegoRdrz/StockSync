@@ -92,6 +92,30 @@ public class ProductoServiceTests
     }
 
     [Fact]
+    public async Task CrearAsync_SkuDeProductoDadoDeBaja_PermiteReutilizarlo()
+    {
+        var original = await _service.CrearAsync(Request("FER-001"), CancellationToken.None);
+        await _service.EliminarAsync(original.Id, CancellationToken.None);
+
+        var nuevo = await _service.CrearAsync(Request(" fer-001 "), CancellationToken.None);
+
+        Assert.NotEqual(original.Id, nuevo.Id);
+        Assert.Equal("FER-001", nuevo.Sku);
+    }
+
+    [Fact]
+    public async Task ActualizarAsync_SkuDeProductoDadoDeBaja_EsValido()
+    {
+        var baja = await _service.CrearAsync(Request("FER-001"), CancellationToken.None);
+        await _service.EliminarAsync(baja.Id, CancellationToken.None);
+        var otro = await _service.CrearAsync(Request("FER-002"), CancellationToken.None);
+
+        var actualizado = await _service.ActualizarAsync(otro.Id, Request("FER-001"), CancellationToken.None);
+
+        Assert.Equal("FER-001", actualizado.Sku);
+    }
+
+    [Fact]
     public async Task ListarAsync_FiltroInvalido_LanzaValidationException()
     {
         await Assert.ThrowsAsync<ValidationException>(
@@ -138,7 +162,7 @@ public class ProductoServiceTests
         }
 
         public Task<bool> ExisteSkuAsync(string sku, Guid? excluirId, CancellationToken cancellationToken) =>
-            Task.FromResult(Productos.Any(p => p.Sku == sku && p.Id != excluirId));
+            Task.FromResult(Productos.Any(p => p.Activo && p.Sku == sku && p.Id != excluirId));
 
         public Task AgregarAsync(Producto producto, CancellationToken cancellationToken)
         {

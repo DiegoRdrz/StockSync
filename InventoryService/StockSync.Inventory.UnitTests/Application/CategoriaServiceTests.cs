@@ -35,6 +35,30 @@ public class CategoriaServiceTests
     }
 
     [Fact]
+    public async Task CrearAsync_NombreDeCategoriaDadaDeBaja_PermiteRecrearla()
+    {
+        var original = await _service.CrearAsync(new("Chocodsa", null), CancellationToken.None);
+        await _service.EliminarAsync(original.Id, CancellationToken.None);
+
+        var recreada = await _service.CrearAsync(new(" chocodsa ", null), CancellationToken.None);
+
+        Assert.NotEqual(original.Id, recreada.Id);
+        Assert.True(recreada.Activo);
+    }
+
+    [Fact]
+    public async Task ActualizarAsync_NombreDeCategoriaDadaDeBaja_EsValido()
+    {
+        var baja = await _service.CrearAsync(new("Temporal", null), CancellationToken.None);
+        await _service.EliminarAsync(baja.Id, CancellationToken.None);
+        var otra = await _service.CrearAsync(new("Herramientas", null), CancellationToken.None);
+
+        var actualizada = await _service.ActualizarAsync(otra.Id, new("Temporal", null), CancellationToken.None);
+
+        Assert.Equal("Temporal", actualizada.Nombre);
+    }
+
+    [Fact]
     public async Task EliminarAsync_ConProductosActivos_LanzaConflictException()
     {
         var categoria = await _service.CrearAsync(new("Herramientas", null), CancellationToken.None);
@@ -68,7 +92,7 @@ public class CategoriaServiceTests
             Task.FromResult(((IReadOnlyList<Categoria>)Categorias.Where(c => c.Activo).ToList(), Categorias.Count(c => c.Activo)));
 
         public Task<bool> ExisteNombreAsync(string nombre, Guid? excluirId, CancellationToken cancellationToken) =>
-            Task.FromResult(Categorias.Any(c => Categoria.NormalizarNombre(c.Nombre) == nombre && c.Id != excluirId));
+            Task.FromResult(Categorias.Any(c => c.Activo && Categoria.NormalizarNombre(c.Nombre) == nombre && c.Id != excluirId));
 
         public Task<bool> ExisteActivaAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(Categorias.Any(c => c.Id == id && c.Activo));

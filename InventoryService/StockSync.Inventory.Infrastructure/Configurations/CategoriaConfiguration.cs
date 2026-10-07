@@ -16,6 +16,7 @@ public class CategoriaConfiguration : IEntityTypeConfiguration<Categoria>
         builder.Property(c => c.Nombre).IsRequired().HasMaxLength(Categoria.NombreMaxLength);
         builder.Property(c => c.Descripcion).HasMaxLength(Categoria.DescripcionMaxLength);
 
-        builder.HasIndex(c => c.Nombre).IsUnique();
+        // La baja es lógica: el nombre solo debe ser único entre categorías activas.
+        builder.HasIndex(c => c.Nombre).IsUnique().HasFilter("\"Activo\"");
     }
 }

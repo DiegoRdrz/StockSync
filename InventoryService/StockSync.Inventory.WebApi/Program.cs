@@ -12,7 +12,6 @@ var ejecutarSemilla = args.Contains("--seed");
 var ejecutarMigraciones = args.Contains("--migrate");
 var builder = WebApplication.CreateBuilder(args.Where(arg => arg is not "--seed" and not "--migrate").ToArray());
 
-// Configurar DbContext con PostgreSQL
 builder.Services.AddDbContext<InventoryDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -26,7 +25,6 @@ builder.Services.AddScoped<IMovimientoStockService, MovimientoStockService>();
 builder.Services.AddScoped<ICategoriaRepository, CategoriaRepository>();
 builder.Services.AddScoped<ICategoriaService, CategoriaService>();
 
-// Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
@@ -58,7 +56,6 @@ if (ejecutarSemilla || ejecutarMigraciones)
 
 app.UseExceptionHandler();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -67,7 +64,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// TODO para el equipo: Agregar los endpoints del Inventory Service aquí o usar Controllers.
 app.MapControllers();
 
 app.Run();

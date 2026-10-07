@@ -9,11 +9,6 @@ public class InventoryDbContext : DbContext
     {
     }
 
-    // TODO para el equipo: Agregar los DbSets de sus entidades aquí
-    // Ejemplo:
-    // public DbSet<Producto> Productos { get; set; }
-    // public DbSet<Categoria> Categorias { get; set; }
-
     public DbSet<Producto> Productos => Set<Producto>();
     public DbSet<Categoria> Categorias => Set<Categoria>();
     public DbSet<Stock> Stocks => Set<Stock>();
@@ -23,7 +18,5 @@ public class InventoryDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(InventoryDbContext).Assembly);
-
-        // TODO para el equipo: Agregar configuraciones de Fluent API aquí si es necesario
     }
 }

@@ -3,7 +3,7 @@ services:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: stock1234
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stock1234}
       POSTGRES_DB: stocksync_inventory
     ports:
       - "5432:5432"
@@ -23,7 +23,9 @@ services:
       - "5001:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=inventory-db;Database=stocksync_inventory;Username=postgres;Password=stock1234
+      - ConnectionStrings__DefaultConnection=Host=inventory-db;Database=stocksync_inventory;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
+      - Inicializacion__AplicarMigraciones=true
+      - Inicializacion__CargarDatosDemo=${CARGAR_DATOS_DEMO:-true}
     depends_on:
       inventory-db:
         condition: service_healthy

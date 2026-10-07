@@ -46,26 +46,33 @@ builder.Services.AddSwaggerGen(options => options.OperationFilter<EncabezadoTena
 
 var app = builder.Build();
 
-if (ejecutarSemilla || ejecutarMigraciones)
+// --migrate y --seed preparan la base y terminan. Con Inicializacion:* (activado en la imagen de Docker)
+// la base se prepara al arrancar y la API sigue en marcha.
+var aplicarMigraciones = ejecutarMigraciones || app.Configuration.GetValue<bool>("Inicializacion:AplicarMigraciones");
+var cargarDatosDemo = ejecutarSemilla || app.Configuration.GetValue<bool>("Inicializacion:CargarDatosDemo");
+
+if (aplicarMigraciones || cargarDatosDemo)
 {
-    if (!app.Environment.IsDevelopment())
-        throw new InvalidOperationException("Los comandos de preparación local solo se pueden ejecutar en Development.");
+    if (cargarDatosDemo && !app.Environment.IsDevelopment())
+        throw new InvalidOperationException("Los datos de demostración solo se pueden cargar en Development.");
 
     await using var scope = app.Services.CreateAsyncScope();
     var context = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
-    if (ejecutarMigraciones)
+    if (aplicarMigraciones)
     {
         await context.Database.MigrateAsync();
         app.Logger.LogInformation("Migraciones completadas.");
     }
-    if (ejecutarSemilla)
+    if (cargarDatosDemo)
     {
         await InventoryDbSeeder.SeedAsync(context);
         app.Logger.LogInformation("Semilla completada. Consulte los IDs en /api/productos y /api/stock/sucursal/{SucursalId}.",
             "11111111-1111-1111-1111-111111111111");
     }
-    return;
 }
+
+if (ejecutarSemilla || ejecutarMigraciones)
+    return;
 
 app.UseExceptionHandler();
 

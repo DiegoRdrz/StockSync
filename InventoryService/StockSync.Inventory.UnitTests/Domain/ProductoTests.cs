@@ -128,6 +128,21 @@ public class ProductoTests
         Assert.Equal(10m, producto.PrecioCompra);
     }
 
+    // Con varias iteraciones, un UtcNow que caiga justo en un microsegundo exacto no oculta el fallo.
+    [Fact]
+    public void Fechas_SeTruncanAMicrosegundosComoEnPostgreSql()
+    {
+        for (var i = 0; i < 20; i++)
+        {
+            var producto = CrearValido();
+            producto.Actualizar("Martillo grande", "FER-001", null, 1m, 2m, 0, null);
+
+            Assert.Equal(0, producto.FechaCreacion.Ticks % TimeSpan.TicksPerMicrosecond);
+            Assert.Equal(0, producto.FechaActualizacion!.Value.Ticks % TimeSpan.TicksPerMicrosecond);
+            Assert.Equal(DateTimeKind.Utc, producto.FechaActualizacion.Value.Kind);
+        }
+    }
+
     [Fact]
     public void Desactivar_MarcaInactivo()
     {

@@ -53,6 +53,21 @@ public class CategoriaTests
         Assert.NotNull(categoria.FechaActualizacion);
     }
 
+    // Con varias iteraciones, un UtcNow que caiga justo en un microsegundo exacto no oculta el fallo.
+    [Fact]
+    public void Fechas_SeTruncanAMicrosegundosComoEnPostgreSql()
+    {
+        for (var i = 0; i < 20; i++)
+        {
+            var categoria = Categoria.Crear("Herramientas", null);
+            categoria.Desactivar();
+
+            Assert.Equal(0, categoria.FechaCreacion.Ticks % TimeSpan.TicksPerMicrosecond);
+            Assert.Equal(0, categoria.FechaActualizacion!.Value.Ticks % TimeSpan.TicksPerMicrosecond);
+            Assert.Equal(DateTimeKind.Utc, categoria.FechaCreacion.Kind);
+        }
+    }
+
     [Fact]
     public void Desactivar_MarcaInactivaYActualizaFecha()
     {

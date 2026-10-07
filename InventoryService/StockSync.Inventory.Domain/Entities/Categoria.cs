@@ -1,3 +1,4 @@
+using StockSync.Inventory.Domain.Common;
 using StockSync.Inventory.Domain.Exceptions;
 
 namespace StockSync.Inventory.Domain.Entities;
@@ -24,7 +25,7 @@ public class Categoria
         {
             Id = Guid.NewGuid(),
             Activo = true,
-            FechaCreacion = DateTime.UtcNow
+            FechaCreacion = RelojUtc.Ahora()
         };
         categoria.EstablecerDatos(nombre, descripcion);
         return categoria;
@@ -34,14 +35,14 @@ public class Categoria
     {
         AsegurarActivo();
         EstablecerDatos(nombre, descripcion);
-        FechaActualizacion = DateTime.UtcNow;
+        FechaActualizacion = RelojUtc.Ahora();
     }
 
     public void Desactivar()
     {
         AsegurarActivo();
         Activo = false;
-        FechaActualizacion = DateTime.UtcNow;
+        FechaActualizacion = RelojUtc.Ahora();
     }
 
     // Se usa para comparar unicidad: "Herramientas" y "  herramientas " se consideran la misma categoría.

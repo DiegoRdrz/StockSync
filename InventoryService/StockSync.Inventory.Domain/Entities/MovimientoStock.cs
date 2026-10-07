@@ -1,3 +1,5 @@
+using StockSync.Inventory.Domain.Common;
+
 namespace StockSync.Inventory.Domain.Entities;
 
 // Se crea únicamente al aplicar un movimiento válido sobre Stock.
@@ -23,8 +25,6 @@ public class MovimientoStock
         Cantidad = cantidad;
         CantidadAnterior = cantidadAnterior;
         CantidadPosterior = stock.Cantidad;
-        // PostgreSQL conserva microsegundos; evita devolver fracciones que se perderían al guardar.
-        var ahora = DateTime.UtcNow;
-        Fecha = new DateTime(ahora.Ticks - ahora.Ticks % TimeSpan.TicksPerMicrosecond, DateTimeKind.Utc);
+        Fecha = RelojUtc.Ahora();
     }
 }

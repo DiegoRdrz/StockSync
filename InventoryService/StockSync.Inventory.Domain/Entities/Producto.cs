@@ -1,3 +1,4 @@
+using StockSync.Inventory.Domain.Common;
 using StockSync.Inventory.Domain.Exceptions;
 
 namespace StockSync.Inventory.Domain.Entities;
@@ -40,7 +41,7 @@ public class Producto
         {
             Id = Guid.NewGuid(),
             Activo = true,
-            FechaCreacion = DateTime.UtcNow
+            FechaCreacion = RelojUtc.Ahora()
         };
         producto.EstablecerDatos(nombre, sku, descripcion, precioCompra, precioVenta, stockMinimo, categoriaId);
         return producto;
@@ -57,14 +58,14 @@ public class Producto
     {
         AsegurarActivo();
         EstablecerDatos(nombre, sku, descripcion, precioCompra, precioVenta, stockMinimo, categoriaId);
-        FechaActualizacion = DateTime.UtcNow;
+        FechaActualizacion = RelojUtc.Ahora();
     }
 
     public void Desactivar()
     {
         AsegurarActivo();
         Activo = false;
-        FechaActualizacion = DateTime.UtcNow;
+        FechaActualizacion = RelojUtc.Ahora();
     }
 
     // El SKU se compara siempre normalizado para que "abc-1" y " ABC-1 " no puedan coexistir.

@@ -1,3 +1,4 @@
+using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Application.Common.Exceptions;
 using StockSync.Inventory.Domain.Entities;
 using StockSync.Inventory.Domain.Repositories;
@@ -58,18 +59,43 @@ public class StockService : IStockService
         return StockResponse.Desde(stock);
     }
 
-    public async Task<IReadOnlyList<StockResponse>> ListarPorSucursalAsync(Guid sucursalId, CancellationToken cancellationToken)
+    public async Task<ResultadoPaginado<StockResponse>> ListarPorSucursalAsync(
+        Guid sucursalId, StockFiltro filtro, CancellationToken cancellationToken)
     {
-        var items = await _stockRepository.ListarPorSucursalAsync(sucursalId, cancellationToken);
+        LanzarSiHayErrores(StockValidator.Validar(filtro));
 
-        return items.Select(StockResponse.Desde).ToList();
+        var (items, total) = await _stockRepository.ListarPorSucursalAsync(
+            sucursalId, Desplazamiento(filtro), filtro.TamanoPagina, cancellationToken);
+
+        return new ResultadoPaginado<StockResponse>(
+            items.Select(StockResponse.Desde).ToList(), filtro.Pagina, filtro.TamanoPagina, total);
     }
 
-    public async Task<IReadOnlyList<StockResponse>> ListarPorProductoAsync(Guid productoId, CancellationToken cancellationToken)
+    public async Task<ResultadoPaginado<StockResponse>> ListarPorProductoAsync(
+        Guid productoId, StockFiltro filtro, CancellationToken cancellationToken)
     {
-        var items = await _stockRepository.ListarPorProductoAsync(productoId, cancellationToken);
+        LanzarSiHayErrores(StockValidator.Validar(filtro));
 
-        return items.Select(StockResponse.Desde).ToList();
+        if (await _productoRepository.ObtenerPorIdAsync(productoId, cancellationToken) is null)
+            throw new NotFoundException($"No se encontró el producto con id '{productoId}'.");
+
+        var (items, total) = await _stockRepository.ListarPorProductoAsync(
+            productoId, Desplazamiento(filtro), filtro.TamanoPagina, cancellationToken);
+
+        return new ResultadoPaginado<StockResponse>(
+            items.Select(StockResponse.Desde).ToList(), filtro.Pagina, filtro.TamanoPagina, total);
+    }
+
+    public async Task<ResultadoPaginado<StockBajoMinimoResponse>> ListarBajoMinimoAsync(
+        StockBajoMinimoFiltro filtro, CancellationToken cancellationToken)
+    {
+        LanzarSiHayErrores(StockValidator.Validar(filtro));
+
+        var (items, total) = await _stockRepository.ListarBajoMinimoAsync(
+            filtro.SucursalId, Desplazamiento(filtro), filtro.TamanoPagina, cancellationToken);
+
+        return new ResultadoPaginado<StockBajoMinimoResponse>(
+            items.Select(StockBajoMinimoResponse.Desde).ToList(), filtro.Pagina, filtro.TamanoPagina, total);
     }
 
     public Task<StockResponse> ActualizarCantidadAsync(Guid id, StockCantidadRequest request, CancellationToken cancellationToken)
@@ -111,6 +137,8 @@ public class StockService : IStockService
         if (await _productoRepository.ObtenerPorIdAsync(productoId, cancellationToken) is null)
             throw new ConflictException($"El producto '{productoId}' está dado de baja; su stock no admite cambios.");
     }
+
+    private static int Desplazamiento(StockFiltro filtro) => (filtro.Pagina - 1) * filtro.TamanoPagina;
 
     private static void LanzarSiHayErrores(Dictionary<string, string[]> errores)
     {

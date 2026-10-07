@@ -134,18 +134,35 @@ public partial class StockServiceTests
         await _service.CrearAsync(new StockRequest(producto2.Id, sucursalA, 25), CancellationToken.None);
         await _service.CrearAsync(new StockRequest(producto1.Id, sucursalB, 4), CancellationToken.None);
 
-        var resultado = await _service.ListarPorSucursalAsync(sucursalA, CancellationToken.None);
+        var resultado = await _service.ListarPorSucursalAsync(sucursalA, new StockFiltro(), CancellationToken.None);
 
-        Assert.Equal(2, resultado.Count);
-        Assert.All(resultado, s => Assert.Equal(sucursalA, s.SucursalId));
+        Assert.Equal(2, resultado.Total);
+        Assert.All(resultado.Items, s => Assert.Equal(sucursalA, s.SucursalId));
     }
 
     [Fact]
     public async Task ListarPorSucursalAsync_SinAsignaciones_DevuelveListaVacia()
     {
-        var resultado = await _service.ListarPorSucursalAsync(Guid.NewGuid(), CancellationToken.None);
+        var resultado = await _service.ListarPorSucursalAsync(Guid.NewGuid(), new StockFiltro(), CancellationToken.None);
 
-        Assert.Empty(resultado);
+        Assert.Empty(resultado.Items);
+    }
+
+    [Fact]
+    public async Task ListarPorSucursalAsync_Pagina()
+    {
+        var sucursalId = Guid.NewGuid();
+        for (var i = 0; i < 3; i++)
+            await _service.CrearAsync(new StockRequest(CrearProducto($"FER-00{i}").Id, sucursalId, 0), CancellationToken.None);
+
+        var resultado = await _service.ListarPorSucursalAsync(
+            sucursalId, new StockFiltro { Pagina = 2, TamanoPagina = 2 }, CancellationToken.None);
+
+        Assert.Single(resultado.Items);
+        Assert.Equal(3, resultado.Total);
+        Assert.Equal(2, resultado.TotalPaginas);
+        await Assert.ThrowsAsync<ValidationException>(() => _service.ListarPorSucursalAsync(
+            sucursalId, new StockFiltro { Pagina = int.MaxValue }, CancellationToken.None));
     }
 
     [Fact]
@@ -157,10 +174,22 @@ public partial class StockServiceTests
         await _service.CrearAsync(new StockRequest(producto1.Id, Guid.NewGuid(), 20), CancellationToken.None);
         await _service.CrearAsync(new StockRequest(producto2.Id, Guid.NewGuid(), 5), CancellationToken.None);
 
-        var resultado = await _service.ListarPorProductoAsync(producto1.Id, CancellationToken.None);
+        var resultado = await _service.ListarPorProductoAsync(producto1.Id, new StockFiltro(), CancellationToken.None);
 
-        Assert.Equal(2, resultado.Count);
-        Assert.All(resultado, s => Assert.Equal(producto1.Id, s.ProductoId));
+        Assert.Equal(2, resultado.Total);
+        Assert.All(resultado.Items, s => Assert.Equal(producto1.Id, s.ProductoId));
+    }
+
+    [Fact]
+    public async Task ListarPorProductoAsync_ProductoInexistenteODadoDeBaja_LanzaNotFoundException()
+    {
+        var baja = CrearProducto();
+        baja.Desactivar();
+
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => _service.ListarPorProductoAsync(Guid.NewGuid(), new StockFiltro(), CancellationToken.None));
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => _service.ListarPorProductoAsync(baja.Id, new StockFiltro(), CancellationToken.None));
     }
 
     [Fact]
@@ -286,11 +315,21 @@ public partial class StockServiceTests
         public Task<Stock?> ObtenerPorProductoYSucursalAsync(Guid productoId, Guid sucursalId, CancellationToken cancellationToken) =>
             Task.FromResult(Stocks.FirstOrDefault(s => s.ProductoId == productoId && s.SucursalId == sucursalId));
 
-        public Task<IReadOnlyList<Stock>> ListarPorSucursalAsync(Guid sucursalId, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<Stock>>(Stocks.Where(s => s.SucursalId == sucursalId).ToList());
+        public Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorSucursalAsync(
+            Guid sucursalId, int skip, int take, CancellationToken cancellationToken) =>
+            Paginar(Stocks.Where(s => s.SucursalId == sucursalId).ToList(), skip, take);
 
-        public Task<IReadOnlyList<Stock>> ListarPorProductoAsync(Guid productoId, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<Stock>>(Stocks.Where(s => s.ProductoId == productoId).ToList());
+        public Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorProductoAsync(
+            Guid productoId, int skip, int take, CancellationToken cancellationToken) =>
+            Paginar(Stocks.Where(s => s.ProductoId == productoId).ToList(), skip, take);
+
+        // La comparación con el stock mínimo necesita el join con productos: se prueba contra PostgreSQL.
+        public Task<(IReadOnlyList<StockBajoMinimoDetalle> Items, int Total)> ListarBajoMinimoAsync(
+            Guid? sucursalId, int skip, int take, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        private static Task<(IReadOnlyList<Stock> Items, int Total)> Paginar(List<Stock> stocks, int skip, int take) =>
+            Task.FromResult<(IReadOnlyList<Stock>, int)>((stocks.Skip(skip).Take(take).ToList(), stocks.Count));
 
         public Task<bool> ExisteAsync(Guid productoId, Guid sucursalId, CancellationToken cancellationToken) =>
             Task.FromResult(Stocks.Any(s => s.ProductoId == productoId && s.SucursalId == sucursalId));

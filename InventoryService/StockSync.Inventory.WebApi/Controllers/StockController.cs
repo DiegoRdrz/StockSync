@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Application.Stocks;
 
 namespace StockSync.Inventory.WebApi.Controllers;
@@ -32,18 +33,31 @@ public class StockController : ControllerBase
         Ok(await _stockService.ObtenerPorIdAsync(id, cancellationToken));
 
     [HttpGet("sucursal/{sucursalId:guid}")]
-    [ProducesResponseType(typeof(IReadOnlyList<StockResponse>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<StockResponse>>> ListarPorSucursal(
+    [ProducesResponseType(typeof(ResultadoPaginado<StockResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ResultadoPaginado<StockResponse>>> ListarPorSucursal(
         Guid sucursalId,
+        [FromQuery] StockFiltro filtro,
         CancellationToken cancellationToken) =>
-        Ok(await _stockService.ListarPorSucursalAsync(sucursalId, cancellationToken));
+        Ok(await _stockService.ListarPorSucursalAsync(sucursalId, filtro, cancellationToken));
 
     [HttpGet("producto/{productoId:guid}")]
-    [ProducesResponseType(typeof(IReadOnlyList<StockResponse>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<StockResponse>>> ListarPorProducto(
+    [ProducesResponseType(typeof(ResultadoPaginado<StockResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ResultadoPaginado<StockResponse>>> ListarPorProducto(
         Guid productoId,
+        [FromQuery] StockFiltro filtro,
         CancellationToken cancellationToken) =>
-        Ok(await _stockService.ListarPorProductoAsync(productoId, cancellationToken));
+        Ok(await _stockService.ListarPorProductoAsync(productoId, filtro, cancellationToken));
+
+    [HttpGet("bajo-minimo")]
+    [ProducesResponseType(typeof(ResultadoPaginado<StockBajoMinimoResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ResultadoPaginado<StockBajoMinimoResponse>>> ListarBajoMinimo(
+        [FromQuery] StockBajoMinimoFiltro filtro,
+        CancellationToken cancellationToken) =>
+        Ok(await _stockService.ListarBajoMinimoAsync(filtro, cancellationToken));
 
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]

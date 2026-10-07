@@ -28,6 +28,24 @@ public static class StockValidator
         return Convertir(errores);
     }
 
+    public static Dictionary<string, string[]> Validar(StockFiltro filtro)
+    {
+        var errores = new Dictionary<string, List<string>>();
+
+        if (filtro.Pagina < 1)
+            Agregar(errores, nameof(filtro.Pagina), "La página debe ser mayor o igual a 1.");
+
+        if (filtro.TamanoPagina < 1 || filtro.TamanoPagina > StockFiltro.TamanoPaginaMaximo)
+            Agregar(errores, nameof(filtro.TamanoPagina), $"El tamaño de página debe estar entre 1 y {StockFiltro.TamanoPaginaMaximo}.");
+
+        // El desplazamiento (Pagina - 1) * TamanoPagina se calcula en int y no debe desbordarse.
+        if (filtro.Pagina > 0 && filtro.TamanoPagina > 0 &&
+            (long)(filtro.Pagina - 1) * filtro.TamanoPagina > int.MaxValue)
+            Agregar(errores, nameof(filtro.Pagina), "La página solicitada excede el límite permitido.");
+
+        return Convertir(errores);
+    }
+
     private static void Agregar(Dictionary<string, List<string>> errores, string campo, string mensaje)
     {
         if (!errores.TryGetValue(campo, out var mensajes))

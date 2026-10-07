@@ -1,3 +1,5 @@
+using StockSync.Inventory.Application.Common;
+
 namespace StockSync.Inventory.Application.Stocks;
 
 public interface IStockService
@@ -6,9 +8,14 @@ public interface IStockService
 
     Task<StockResponse> ObtenerPorIdAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<StockResponse>> ListarPorSucursalAsync(Guid sucursalId, CancellationToken cancellationToken);
+    Task<ResultadoPaginado<StockResponse>> ListarPorSucursalAsync(
+        Guid sucursalId, StockFiltro filtro, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<StockResponse>> ListarPorProductoAsync(Guid productoId, CancellationToken cancellationToken);
+    Task<ResultadoPaginado<StockResponse>> ListarPorProductoAsync(
+        Guid productoId, StockFiltro filtro, CancellationToken cancellationToken);
+
+    Task<ResultadoPaginado<StockBajoMinimoResponse>> ListarBajoMinimoAsync(
+        StockBajoMinimoFiltro filtro, CancellationToken cancellationToken);
 
     Task<StockResponse> ActualizarCantidadAsync(Guid id, StockCantidadRequest request, CancellationToken cancellationToken);
 

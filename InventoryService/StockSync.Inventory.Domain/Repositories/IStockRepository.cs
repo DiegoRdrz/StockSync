@@ -12,9 +12,16 @@ public interface IStockRepository
 
     Task<Stock?> ObtenerPorProductoYSucursalAsync(Guid productoId, Guid sucursalId, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<Stock>> ListarPorSucursalAsync(Guid sucursalId, CancellationToken cancellationToken);
+    // Excluye los stocks de productos dados de baja.
+    Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorSucursalAsync(
+        Guid sucursalId, int skip, int take, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<Stock>> ListarPorProductoAsync(Guid productoId, CancellationToken cancellationToken);
+    Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorProductoAsync(
+        Guid productoId, int skip, int take, CancellationToken cancellationToken);
+
+    // Stocks de productos activos con Cantidad < StockMinimo, de mayor a menor faltante.
+    Task<(IReadOnlyList<StockBajoMinimoDetalle> Items, int Total)> ListarBajoMinimoAsync(
+        Guid? sucursalId, int skip, int take, CancellationToken cancellationToken);
 
     Task<bool> ExisteAsync(Guid productoId, Guid sucursalId, CancellationToken cancellationToken);
 

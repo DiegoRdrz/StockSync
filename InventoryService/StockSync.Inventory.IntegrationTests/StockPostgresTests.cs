@@ -84,6 +84,53 @@ public class StockPostgresTests : PostgresTestBase
     }
 
     [PostgreSqlFact]
+    public async Task ListadoPorSucursal_ExcluyeProductosDadosDeBajaYPagina()
+    {
+        var sucursal = Guid.NewGuid();
+        var activos = new[] { await CrearProductoAsync("A-1"), await CrearProductoAsync("A-2") };
+        var baja = await CrearProductoAsync("B-1");
+        await using var context = CrearContexto();
+        var stockService = CrearStockService(context);
+        foreach (var producto in activos.Append(baja))
+            await stockService.CrearAsync(new(producto.Id, sucursal, 0), default);
+        await new ProductoService(new ProductoRepository(context), new CategoriaRepository(context))
+            .EliminarAsync(baja.Id, default);
+
+        var pagina1 = await stockService.ListarPorSucursalAsync(sucursal, new StockFiltro { TamanoPagina = 1 }, default);
+        var pagina2 = await stockService.ListarPorSucursalAsync(sucursal, new StockFiltro { Pagina = 2, TamanoPagina = 1 }, default);
+
+        Assert.Equal(2, pagina1.Total);
+        Assert.Equal(activos.Select(p => p.Id),
+            pagina1.Items.Concat(pagina2.Items).Select(s => s.ProductoId));
+        await Assert.ThrowsAsync<NotFoundException>(
+            () => stockService.ListarPorProductoAsync(baja.Id, new StockFiltro(), default));
+    }
+
+    [PostgreSqlFact]
+    public async Task BajoMinimo_ListaSoloCantidadesMenoresAlMinimoOrdenadasPorFaltante()
+    {
+        var sucursal = Guid.NewGuid();
+        var otraSucursal = Guid.NewGuid();
+        var minimoCinco = await CrearProductoAsync("MIN-5", stockMinimo: 5);
+        var minimoDiez = await CrearProductoAsync("MIN-10", stockMinimo: 10);
+        var sinMinimo = await CrearProductoAsync("MIN-0", stockMinimo: 0);
+        await using var context = CrearContexto();
+        var stockService = CrearStockService(context);
+        var alertaLeve = await stockService.CrearAsync(new(minimoCinco.Id, sucursal, 3), default);
+        await stockService.CrearAsync(new(minimoCinco.Id, otraSucursal, 5), default);
+        var alertaGrave = await stockService.CrearAsync(new(minimoDiez.Id, otraSucursal, 1), default);
+        await stockService.CrearAsync(new(sinMinimo.Id, sucursal, 0), default);
+
+        var todas = await stockService.ListarBajoMinimoAsync(new StockBajoMinimoFiltro(), default);
+        var deSucursal = await stockService.ListarBajoMinimoAsync(new StockBajoMinimoFiltro { SucursalId = sucursal }, default);
+
+        Assert.Equal(new[] { alertaGrave.Id, alertaLeve.Id }, todas.Items.Select(a => a.StockId));
+        Assert.Equal(new[] { 9, 2 }, todas.Items.Select(a => a.Faltante));
+        Assert.Equal("MIN-10", todas.Items[0].ProductoSku);
+        Assert.Equal(alertaLeve.Id, Assert.Single(deSucursal.Items).StockId);
+    }
+
+    [PostgreSqlFact]
     public async Task EliminarProductoYStock_SoloSinExistencias()
     {
         var producto = await CrearProductoAsync();

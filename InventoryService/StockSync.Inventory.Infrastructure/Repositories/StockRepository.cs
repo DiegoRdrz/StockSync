@@ -30,19 +30,65 @@ public class StockRepository : IStockRepository
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.ProductoId == productoId && s.SucursalId == sucursalId, cancellationToken);
 
-    public async Task<IReadOnlyList<Stock>> ListarPorSucursalAsync(Guid sucursalId, CancellationToken cancellationToken) =>
-        await _context.Stocks
-            .AsNoTracking()
-            .Where(s => s.SucursalId == sucursalId)
-            .OrderBy(s => s.ProductoId)
+    public async Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorSucursalAsync(
+        Guid sucursalId, int skip, int take, CancellationToken cancellationToken)
+    {
+        var query = from stock in _context.Stocks.AsNoTracking()
+                    join producto in _context.Productos.AsNoTracking() on stock.ProductoId equals producto.Id
+                    where stock.SucursalId == sucursalId && producto.Activo
+                    select new { Stock = stock, producto.Nombre };
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(x => x.Nombre)
+            .ThenBy(x => x.Stock.Id)
+            .Skip(skip)
+            .Take(take)
+            .Select(x => x.Stock)
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<Stock>> ListarPorProductoAsync(Guid productoId, CancellationToken cancellationToken) =>
-        await _context.Stocks
-            .AsNoTracking()
-            .Where(s => s.ProductoId == productoId)
+        return (items, total);
+    }
+
+    public async Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorProductoAsync(
+        Guid productoId, int skip, int take, CancellationToken cancellationToken)
+    {
+        var query = _context.Stocks.AsNoTracking().Where(s => s.ProductoId == productoId);
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
             .OrderBy(s => s.SucursalId)
+            .ThenBy(s => s.Id)
+            .Skip(skip)
+            .Take(take)
             .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
+
+    public async Task<(IReadOnlyList<StockBajoMinimoDetalle> Items, int Total)> ListarBajoMinimoAsync(
+        Guid? sucursalId, int skip, int take, CancellationToken cancellationToken)
+    {
+        var query = from stock in _context.Stocks.AsNoTracking()
+                    join producto in _context.Productos.AsNoTracking() on stock.ProductoId equals producto.Id
+                    where producto.Activo && stock.Cantidad < producto.StockMinimo
+                    select new { Stock = stock, Producto = producto };
+
+        if (sucursalId.HasValue)
+            query = query.Where(x => x.Stock.SucursalId == sucursalId);
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(x => x.Producto.StockMinimo - x.Stock.Cantidad)
+            .ThenBy(x => x.Producto.Nombre)
+            .ThenBy(x => x.Stock.Id)
+            .Skip(skip)
+            .Take(take)
+            .Select(x => new StockBajoMinimoDetalle(x.Stock, x.Producto.Nombre, x.Producto.Sku, x.Producto.StockMinimo))
+            .ToListAsync(cancellationToken);
+
+        return (items, total);
+    }
 
     public Task<bool> ExisteAsync(Guid productoId, Guid sucursalId, CancellationToken cancellationToken) =>
         _context.Stocks.AnyAsync(

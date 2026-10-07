@@ -78,9 +78,9 @@ y 4 movimientos mediante Entity Framework y los métodos de creación del domini
 Un único `SaveChangesAsync` guarda todo en una transacción. Solo se ejecuta
 con `--seed` en `Development`, después de aplicar las migraciones.
 
-Busca categorías por nombre normalizado, productos por SKU y stocks por
-producto/sucursal. Repetirla no duplica registros ni reinicia saldos o reactiva
-productos. Los movimientos iniciales solo se agregan al crear su stock.
+Busca categorías activas por nombre normalizado, productos por SKU (priorizando
+el activo si el SKU se reutilizó tras una baja) y stocks por producto/sucursal.
+Repetirla no duplica registros ni reinicia saldos o reactiva productos. Los movimientos iniciales solo se agregan al crear su stock.
 Los IDs se generan mediante las entidades; consulta los stocks por sucursal
 para obtenerlos antes de probar entradas y salidas.
 
@@ -112,34 +112,24 @@ para crear datos propios y recorrer el flujo de movimientos.
 
 ## Consultar movimientos sin conocer IDs
 
-`GET /api/movimientos` lista todos los movimientos, ordenados por fecha descendente
-y por ID para desempatar. La respuesta incluye `items`, `pagina`, `tamanoPagina`,
-`total` y `totalPaginas`. Cada registro muestra `productoNombre`, `productoSku`,
+`GET /api/movimientos` devuelve los 10 movimientos más recientes de todos los
+stocks, ordenados por fecha descendente y por ID para desempatar.
+`GET /api/movimientos/pagina/{pagina}` devuelve las páginas siguientes, siempre
+de 10 en 10. La respuesta incluye `items`, `pagina`, `tamanoPagina`, `total` y
+`totalPaginas`. Cada registro muestra `productoNombre`, `productoSku`,
 `productoId`, `stockId`, `sucursalId`, tipo, cantidad, saldos anterior/posterior y fecha.
 Los nombres y SKU son los actuales; también se incluye el historial de productos inactivos.
-
-Todos los filtros son opcionales y se pueden combinar:
-
-| Parámetro | Uso |
-| --- | --- |
-| `busqueda` | Coincidencia parcial por nombre o SKU, sin distinguir mayúsculas |
-| `tipo` | `Entrada` o `Salida` |
-| `desde`, `hasta` | Límites inclusivos de fecha/hora ISO 8601 con zona, por ejemplo `2026-10-06T00:00:00Z` |
-| `sucursalId` | Limitar a una sucursal si conoces su ID |
-| `pagina`, `tamanoPagina` | Por defecto 1 y 20; máximo 100 registros por página |
 
 Ejemplos con Docker:
 
 ```bash
 curl 'http://localhost:5001/api/movimientos'
-curl 'http://localhost:5001/api/movimientos?busqueda=martillo&tipo=Salida'
-curl 'http://localhost:5001/api/movimientos?busqueda=DEMO-HER&pagina=1&tamanoPagina=10'
-curl 'http://localhost:5001/api/movimientos?desde=2026-10-06T00:00:00Z&hasta=2026-10-06T23:59:59.999999Z'
+curl 'http://localhost:5001/api/movimientos/pagina/2'
 ```
 
-Sin coincidencias devuelve HTTP 200 con `items: []`; filtros inválidos devuelven
-HTTP 400. Para consultar solo un stock sigue disponible
-`GET /api/stock/{stockId}/movimientos`.
+Una página sin registros devuelve HTTP 200 con `items: []`; una página menor que 1
+devuelve HTTP 400. Este listado no admite filtros; para consultar solo un stock usa
+`GET /api/stock/{stockId}/movimientos?pagina=1&tamanoPagina=20`.
 
 ## Pruebas
 
@@ -149,7 +139,7 @@ Desde `InventoryService`:
 dotnet test StockSync.Inventory.sln
 
 # Incluye integración real con PostgreSQL (usuario con permiso CREATE DATABASE).
-STOCKSYNC_TEST_POSTGRES='Host=localhost;Database=postgres;Username=postgres;Password=mysecretpassword' \
+STOCKSYNC_TEST_POSTGRES='Host=localhost;Database=postgres;Username=postgres;Password=stock1234' \
   dotnet test StockSync.Inventory.sln
 ```
 

@@ -5,7 +5,7 @@ using StockSync.Inventory.Domain.Repositories;
 
 namespace StockSync.Inventory.UnitTests.Application;
 
-public class StockServiceTests
+public partial class StockServiceTests
 {
     private readonly FakeStockRepository _stockRepository = new();
     private readonly FakeProductoRepository _productoRepository = new();

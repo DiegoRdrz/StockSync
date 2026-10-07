@@ -4,6 +4,7 @@ using StockSync.Inventory.Application.Movimientos;
 using StockSync.Inventory.Application.Productos;
 using StockSync.Inventory.Application.Stocks;
 using StockSync.Inventory.Domain.Entities;
+using StockSync.Inventory.Domain.Exceptions;
 using StockSync.Inventory.Infrastructure;
 using StockSync.Inventory.Infrastructure.Repositories;
 
@@ -12,10 +13,12 @@ namespace StockSync.Inventory.IntegrationTests;
 public class StockPostgresTests : PostgresTestBase
 {
     private static StockService CrearStockService(InventoryDbContext context) =>
-        new(new StockRepository(context), new ProductoRepository(context), new MovimientoStockRepository(context));
+        new(new StockRepository(context), new ProductoRepository(context), new MovimientoStockRepository(context),
+            new UnidadDeTrabajo(context));
 
     private static MovimientoStockService CrearMovimientoService(InventoryDbContext context) =>
-        new(new StockRepository(context), new ProductoRepository(context), new MovimientoStockRepository(context));
+        new(new StockRepository(context), new ProductoRepository(context), new MovimientoStockRepository(context),
+            new UnidadDeTrabajo(context));
 
     private async Task<Producto> CrearProductoAsync(string sku = "FER-001", int stockMinimo = 0)
     {
@@ -47,6 +50,37 @@ public class StockPostgresTests : PostgresTestBase
             movimientos.Select(m => m.Tipo));
         Assert.Equal(20, saldo);
         Assert.Equal(saldo, movimientos.Sum(m => m.CantidadPosterior - m.CantidadAnterior));
+    }
+
+    // Con bloqueo optimista solo, la mayoría recibía 409 por concurrencia aunque hubiera stock disponible.
+    [PostgreSqlFact]
+    public async Task VentasSimultaneas_SeAplicanEnOrdenSinSobreventaNiConflictos()
+    {
+        var producto = await CrearProductoAsync();
+        Guid stockId;
+        await using (var context = CrearContexto())
+            stockId = (await CrearStockService(context).CrearAsync(new(producto.Id, Guid.NewGuid(), 10), default)).Id;
+
+        var resultados = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(async () =>
+        {
+            await using var context = CrearContexto();
+            try
+            {
+                await CrearMovimientoService(context).RegistrarSalidaAsync(stockId, new(1), default);
+                return true;
+            }
+            catch (StockInsuficienteException)
+            {
+                return false;
+            }
+        })));
+
+        Assert.Equal(10, resultados.Count(vendida => vendida));
+        await using var verificacion = CrearContexto();
+        Assert.Equal(0, (await verificacion.Stocks.SingleAsync()).Cantidad);
+        var salidas = await verificacion.MovimientosStock
+            .Where(m => m.Tipo == TipoMovimientoStock.Salida).OrderBy(m => m.CantidadAnterior).ToListAsync();
+        Assert.Equal(Enumerable.Range(1, 10), salidas.Select(m => m.CantidadAnterior));
     }
 
     [PostgreSqlFact]

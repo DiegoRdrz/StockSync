@@ -66,7 +66,7 @@ public class MovimientosPostgresTests : IAsyncLifetime
         martillo.Desactivar();
         await context.SaveChangesAsync();
         var service = new MovimientoStockService(new StockRepository(context), new ProductoRepository(context),
-            new MovimientoStockRepository(context));
+            new MovimientoStockRepository(context), new UnidadDeTrabajo(context));
 
         var pagina1 = await service.ListarGeneralAsync(1, default);
         var pagina2 = await service.ListarGeneralAsync(2, default);

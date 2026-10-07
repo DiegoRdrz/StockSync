@@ -21,6 +21,7 @@ builder.Services.AddScoped<IStockRepository, StockRepository>();
 builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<IMovimientoStockRepository, MovimientoStockRepository>();
 builder.Services.AddScoped<IMovimientoStockService, MovimientoStockService>();
+builder.Services.AddScoped<IUnidadDeTrabajo, UnidadDeTrabajo>();
 
 builder.Services.AddScoped<ICategoriaRepository, CategoriaRepository>();
 builder.Services.AddScoped<ICategoriaService, CategoriaService>();

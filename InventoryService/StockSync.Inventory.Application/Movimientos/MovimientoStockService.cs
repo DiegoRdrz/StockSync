@@ -10,13 +10,15 @@ public class MovimientoStockService : IMovimientoStockService
     private readonly IStockRepository _stockRepository;
     private readonly IProductoRepository _productoRepository;
     private readonly IMovimientoStockRepository _movimientoRepository;
+    private readonly IUnidadDeTrabajo _unidadDeTrabajo;
 
     public MovimientoStockService(IStockRepository stockRepository, IProductoRepository productoRepository,
-        IMovimientoStockRepository movimientoRepository)
+        IMovimientoStockRepository movimientoRepository, IUnidadDeTrabajo unidadDeTrabajo)
     {
         _stockRepository = stockRepository;
         _productoRepository = productoRepository;
         _movimientoRepository = movimientoRepository;
+        _unidadDeTrabajo = unidadDeTrabajo;
     }
 
     public Task<MovimientoStockResponse> RegistrarEntradaAsync(Guid stockId, MovimientoStockRequest request, CancellationToken cancellationToken) =>
@@ -25,24 +27,29 @@ public class MovimientoStockService : IMovimientoStockService
     public Task<MovimientoStockResponse> RegistrarSalidaAsync(Guid stockId, MovimientoStockRequest request, CancellationToken cancellationToken) =>
         RegistrarAsync(stockId, TipoMovimientoStock.Salida, request, cancellationToken);
 
-    private async Task<MovimientoStockResponse> RegistrarAsync(Guid stockId, TipoMovimientoStock tipo,
+    private Task<MovimientoStockResponse> RegistrarAsync(Guid stockId, TipoMovimientoStock tipo,
         MovimientoStockRequest request, CancellationToken cancellationToken)
     {
         LanzarSiHayErrores(MovimientoStockValidator.Validar(request));
 
-        var stock = await _stockRepository.ObtenerParaActualizarAsync(stockId, cancellationToken)
-            ?? throw StockNoEncontrado(stockId);
+        // Con la fila bloqueada, dos ventas simultáneas se aplican una tras otra sobre el saldo real
+        // en lugar de rechazar la segunda por conflicto de concurrencia.
+        return _unidadDeTrabajo.EjecutarEnTransaccionAsync(async () =>
+        {
+            var stock = await _stockRepository.ObtenerParaActualizarAsync(stockId, cancellationToken)
+                ?? throw StockNoEncontrado(stockId);
 
-        if (await _productoRepository.ObtenerPorIdAsync(stock.ProductoId, cancellationToken) is null)
-            throw new ConflictException($"El producto '{stock.ProductoId}' está dado de baja; su stock no admite movimientos.");
+            if (await _productoRepository.ObtenerPorIdAsync(stock.ProductoId, cancellationToken) is null)
+                throw new ConflictException($"El producto '{stock.ProductoId}' está dado de baja; su stock no admite movimientos.");
 
-        var movimiento = stock.RegistrarMovimiento(tipo, request.Cantidad);
-        await _movimientoRepository.AgregarAsync(movimiento, cancellationToken);
+            var movimiento = stock.RegistrarMovimiento(tipo, request.Cantidad);
+            await _movimientoRepository.AgregarAsync(movimiento, cancellationToken);
 
-        // Ambos repositorios comparten el DbContext del request. Un único SaveChanges
-        // confirma el saldo y su historial; si hay conflicto, se revierte todo.
-        await _stockRepository.GuardarCambiosAsync(cancellationToken);
-        return MovimientoStockResponse.Desde(movimiento);
+            // Ambos repositorios comparten el DbContext del request. Un único SaveChanges
+            // confirma el saldo y su historial; si hay conflicto, se revierte todo.
+            await _stockRepository.GuardarCambiosAsync(cancellationToken);
+            return MovimientoStockResponse.Desde(movimiento);
+        }, cancellationToken);
     }
 
     public async Task<MovimientoStockResponse> ObtenerPorIdAsync(Guid stockId, Guid id, CancellationToken cancellationToken)

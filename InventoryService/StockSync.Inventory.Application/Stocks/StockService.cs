@@ -9,15 +9,18 @@ public class StockService : IStockService
     private readonly IStockRepository _stockRepository;
     private readonly IProductoRepository _productoRepository;
     private readonly IMovimientoStockRepository _movimientoRepository;
+    private readonly IUnidadDeTrabajo _unidadDeTrabajo;
 
     public StockService(
         IStockRepository stockRepository,
         IProductoRepository productoRepository,
-        IMovimientoStockRepository movimientoRepository)
+        IMovimientoStockRepository movimientoRepository,
+        IUnidadDeTrabajo unidadDeTrabajo)
     {
         _stockRepository = stockRepository;
         _productoRepository = productoRepository;
         _movimientoRepository = movimientoRepository;
+        _unidadDeTrabajo = unidadDeTrabajo;
     }
 
     public async Task<StockResponse> CrearAsync(StockRequest request, CancellationToken cancellationToken)
@@ -69,35 +72,39 @@ public class StockService : IStockService
         return items.Select(StockResponse.Desde).ToList();
     }
 
-    public async Task<StockResponse> ActualizarCantidadAsync(Guid id, StockCantidadRequest request, CancellationToken cancellationToken)
+    public Task<StockResponse> ActualizarCantidadAsync(Guid id, StockCantidadRequest request, CancellationToken cancellationToken)
     {
         LanzarSiHayErrores(StockValidator.Validar(request));
 
-        var stock = await _stockRepository.ObtenerParaActualizarAsync(id, cancellationToken)
-            ?? throw StockNoEncontrado(id);
-        await AsegurarProductoActivoAsync(stock.ProductoId, cancellationToken);
+        return _unidadDeTrabajo.EjecutarEnTransaccionAsync(async () =>
+        {
+            var stock = await _stockRepository.ObtenerParaActualizarAsync(id, cancellationToken)
+                ?? throw StockNoEncontrado(id);
+            await AsegurarProductoActivoAsync(stock.ProductoId, cancellationToken);
 
-        var ajuste = stock.ActualizarCantidad(request.NuevaCantidad);
-        if (ajuste is not null)
-            await _movimientoRepository.AgregarAsync(ajuste, cancellationToken);
-        await _stockRepository.GuardarCambiosAsync(cancellationToken);
+            var ajuste = stock.ActualizarCantidad(request.NuevaCantidad);
+            if (ajuste is not null)
+                await _movimientoRepository.AgregarAsync(ajuste, cancellationToken);
+            await _stockRepository.GuardarCambiosAsync(cancellationToken);
 
-        return StockResponse.Desde(stock);
+            return StockResponse.Desde(stock);
+        }, cancellationToken);
     }
 
     // Solo elimina la asignación a la sucursal; el producto no se toca.
-    public async Task EliminarAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var stock = await _stockRepository.ObtenerParaActualizarAsync(id, cancellationToken)
-            ?? throw StockNoEncontrado(id);
+    public Task EliminarAsync(Guid id, CancellationToken cancellationToken) =>
+        _unidadDeTrabajo.EjecutarEnTransaccionAsync(async () =>
+        {
+            var stock = await _stockRepository.ObtenerParaActualizarAsync(id, cancellationToken)
+                ?? throw StockNoEncontrado(id);
 
-        // Borrar una asignación con unidades las haría desaparecer sin ningún movimiento que lo explique.
-        if (stock.Cantidad > 0)
-            throw new ConflictException("No se puede eliminar la asignación porque tiene existencias.");
+            // Borrar una asignación con unidades las haría desaparecer sin ningún movimiento que lo explique.
+            if (stock.Cantidad > 0)
+                throw new ConflictException("No se puede eliminar la asignación porque tiene existencias.");
 
-        _stockRepository.Eliminar(stock);
-        await _stockRepository.GuardarCambiosAsync(cancellationToken);
-    }
+            _stockRepository.Eliminar(stock);
+            await _stockRepository.GuardarCambiosAsync(cancellationToken);
+        }, cancellationToken);
 
     private async Task AsegurarProductoActivoAsync(Guid productoId, CancellationToken cancellationToken)
     {

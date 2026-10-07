@@ -11,7 +11,7 @@ namespace StockSync.Inventory.UnitTests.Application;
 public partial class StockServiceTests
 {
     private readonly FakeMovimientoRepository _movimientos = new();
-    private MovimientoStockService CrearServicioMovimientos() => new(_stockRepository, _productoRepository, _movimientos);
+    private MovimientoStockService CrearServicioMovimientos() => new(_stockRepository, _productoRepository, _movimientos, _unidadDeTrabajo);
 
     [Fact]
     public async Task Movimientos_EntradaYSalida_GuardanSaldoEHistorial()

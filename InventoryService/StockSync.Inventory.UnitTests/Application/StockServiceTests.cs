@@ -9,11 +9,12 @@ public partial class StockServiceTests
 {
     private readonly FakeStockRepository _stockRepository = new();
     private readonly FakeProductoRepository _productoRepository = new();
+    private readonly UnidadDeTrabajoEnMemoria _unidadDeTrabajo = new();
     private readonly StockService _service;
 
     public StockServiceTests()
     {
-        _service = new StockService(_stockRepository, _productoRepository, _movimientos);
+        _service = new StockService(_stockRepository, _productoRepository, _movimientos, _unidadDeTrabajo);
     }
 
     private Producto CrearProducto(string sku = "FER-001")

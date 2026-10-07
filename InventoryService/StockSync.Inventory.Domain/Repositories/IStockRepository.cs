@@ -6,6 +6,8 @@ public interface IStockRepository
 {
     Task<Stock?> ObtenerPorIdAsync(Guid id, CancellationToken cancellationToken);
 
+    // Bloquea la fila hasta que termine la transacción en curso (ver IUnidadDeTrabajo): las operaciones
+    // concurrentes sobre el mismo stock esperan su turno y leen el saldo ya confirmado.
     Task<Stock?> ObtenerParaActualizarAsync(Guid id, CancellationToken cancellationToken);
 
     Task<Stock?> ObtenerPorProductoYSucursalAsync(Guid productoId, Guid sucursalId, CancellationToken cancellationToken);

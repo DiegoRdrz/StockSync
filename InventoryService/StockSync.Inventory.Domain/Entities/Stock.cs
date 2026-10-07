@@ -38,6 +38,26 @@ public class Stock
         Cantidad = nuevaCantidad;
     }
 
+    public MovimientoStock RegistrarMovimiento(TipoMovimientoStock tipo, int cantidad)
+    {
+        if (cantidad <= 0)
+            throw new DomainException("La cantidad del movimiento debe ser mayor que cero.");
+
+        if (!Enum.IsDefined(tipo))
+            throw new DomainException("El tipo de movimiento no es válido.");
+
+        if (tipo == TipoMovimientoStock.Salida && cantidad > Cantidad)
+            throw new StockInsuficienteException(Cantidad, cantidad);
+
+        if (tipo == TipoMovimientoStock.Entrada && cantidad > int.MaxValue - Cantidad)
+            throw new DomainException("La entrada supera la cantidad máxima permitida.");
+
+        var cantidadAnterior = Cantidad;
+        Cantidad = tipo == TipoMovimientoStock.Entrada ? Cantidad + cantidad : Cantidad - cantidad;
+
+        return new MovimientoStock(this, tipo, cantidad, cantidadAnterior);
+    }
+
     private static void AsegurarCantidadValida(int cantidad)
     {
         if (cantidad < 0)

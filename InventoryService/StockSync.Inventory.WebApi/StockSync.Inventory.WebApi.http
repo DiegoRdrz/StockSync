@@ -1,4 +1,10 @@
-@StockSync.Inventory.WebApi_HostAddress = http://localhost:5001
+@StockSync.Inventory.WebApi_HostAddress = http://localhost:5041
+
+### Últimos 10 movimientos (en Docker cambiar el puerto de arriba a 5001)
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/movimientos
+
+### Siguiente página de 10 movimientos
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/movimientos/pagina/2
 
 ### 1. Crear una Categoría
 POST {{StockSync.Inventory.WebApi_HostAddress}}/api/categorias
@@ -59,3 +65,62 @@ Content-Type: application/json
   "stockMinimo": 2,
   "categoriaId": "00000000-0000-0000-0000-000000000000"
 }
+
+### 7. Asignar producto a una sucursal con saldo inicial 0
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock
+Content-Type: application/json
+
+{
+  "productoId": "{{producto_id}}",
+  "sucursalId": "11111111-1111-1111-1111-111111111111",
+  "cantidad": 0
+}
+
+> {%
+    client.global.set("stock_id", response.body.id);
+%}
+
+### 8. Entrada de 10 unidades (201, saldo 10)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/entradas
+Content-Type: application/json
+
+{ "cantidad": 10 }
+
+### 9. Venta de 3 unidades (201, saldo 7)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/salidas
+Content-Type: application/json
+
+{ "cantidad": 3 }
+
+### 10. Intentar vender 8 (409, saldo sigue en 7; no genera movimiento)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/salidas
+Content-Type: application/json
+
+{ "cantidad": 8 }
+
+### 11. Vender las 7 restantes (201, saldo 0)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/salidas
+Content-Type: application/json
+
+{ "cantidad": 7 }
+
+### 12. Intentar vender sin stock (409)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/salidas
+Content-Type: application/json
+
+{ "cantidad": 1 }
+
+### 13. Cantidad inválida (400)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/entradas
+Content-Type: application/json
+
+{ "cantidad": 0 }
+
+### 14. Consultar historial (solo 3 movimientos exitosos)
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/movimientos?pagina=1&tamanoPagina=20
+
+### 15. Consultar saldo final (0)
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}
+
+### 16. El historial impide borrar la asignación (409)
+DELETE {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}

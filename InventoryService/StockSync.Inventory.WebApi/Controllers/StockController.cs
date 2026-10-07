@@ -47,6 +47,7 @@ public class StockController : ControllerBase
         Ok(await _stockService.ListarPorProductoAsync(productoId, cancellationToken));
 
     [HttpPut("{id:guid}")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(StockResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -57,6 +58,7 @@ public class StockController : ControllerBase
         Ok(await _stockService.ActualizarCantidadAsync(id, request, cancellationToken));
 
     [HttpDelete("{id:guid}")]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Eliminar(Guid id, CancellationToken cancellationToken)

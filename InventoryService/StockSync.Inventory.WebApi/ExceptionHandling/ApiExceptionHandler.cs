@@ -25,6 +25,7 @@ public class ApiExceptionHandler : IExceptionHandler
                 Status = StatusCodes.Status400BadRequest,
                 Title = ex.Message
             },
+            StockInsuficienteException ex => Crear(StatusCodes.Status409Conflict, "Stock insuficiente.", ex.Message),
             DomainException ex => Crear(StatusCodes.Status400BadRequest, "Regla de negocio no válida.", ex.Message),
             NotFoundException ex => Crear(StatusCodes.Status404NotFound, "Recurso no encontrado.", ex.Message),
             ConflictException ex => Crear(StatusCodes.Status409Conflict, "Conflicto con el estado actual.", ex.Message),

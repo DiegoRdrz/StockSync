@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using StockSync.Inventory.Application.Categorias;
+using StockSync.Inventory.Application.Movimientos;
 using StockSync.Inventory.Application.Productos;
 using StockSync.Inventory.Application.Stocks;
 using StockSync.Inventory.Domain.Repositories;
@@ -7,7 +8,9 @@ using StockSync.Inventory.Infrastructure;
 using StockSync.Inventory.Infrastructure.Repositories;
 using StockSync.Inventory.WebApi.ExceptionHandling;
 
-var builder = WebApplication.CreateBuilder(args);
+var ejecutarSemilla = args.Contains("--seed");
+var ejecutarMigraciones = args.Contains("--migrate");
+var builder = WebApplication.CreateBuilder(args.Where(arg => arg is not "--seed" and not "--migrate").ToArray());
 
 // Configurar DbContext con PostgreSQL
 builder.Services.AddDbContext<InventoryDbContext>(options =>
@@ -17,6 +20,8 @@ builder.Services.AddScoped<IProductoRepository, ProductoRepository>();
 builder.Services.AddScoped<IProductoService, ProductoService>();
 builder.Services.AddScoped<IStockRepository, StockRepository>();
 builder.Services.AddScoped<IStockService, StockService>();
+builder.Services.AddScoped<IMovimientoStockRepository, MovimientoStockRepository>();
+builder.Services.AddScoped<IMovimientoStockService, MovimientoStockService>();
 
 builder.Services.AddScoped<ICategoriaRepository, CategoriaRepository>();
 builder.Services.AddScoped<ICategoriaService, CategoriaService>();
@@ -29,6 +34,27 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+if (ejecutarSemilla || ejecutarMigraciones)
+{
+    if (!app.Environment.IsDevelopment())
+        throw new InvalidOperationException("Los comandos de preparación local solo se pueden ejecutar en Development.");
+
+    await using var scope = app.Services.CreateAsyncScope();
+    var context = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+    if (ejecutarMigraciones)
+    {
+        await context.Database.MigrateAsync();
+        app.Logger.LogInformation("Migraciones completadas.");
+    }
+    if (ejecutarSemilla)
+    {
+        await InventoryDbSeeder.SeedAsync(context);
+        app.Logger.LogInformation("Semilla completada. Consulte los IDs en /api/productos y /api/stock/sucursal/{SucursalId}.",
+            "11111111-1111-1111-1111-111111111111");
+    }
+    return;
+}
 
 app.UseExceptionHandler();
 

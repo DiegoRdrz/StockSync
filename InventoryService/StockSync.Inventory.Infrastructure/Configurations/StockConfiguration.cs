@@ -8,10 +8,15 @@ public class StockConfiguration : IEntityTypeConfiguration<Stock>
 {
     public void Configure(EntityTypeBuilder<Stock> builder)
     {
-        builder.ToTable("Stocks");
+        builder.ToTable("Stocks", table =>
+            table.HasCheckConstraint("CK_Stocks_Cantidad", "\"Cantidad\" >= 0"));
 
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Id).ValueGeneratedNever();
+
+        // Toda escritura (también el ajuste manual y el borrado) debe partir del saldo leído.
+        // EF incluye la cantidad original en el WHERE y detecta actualizaciones concurrentes.
+        builder.Property(s => s.Cantidad).IsConcurrencyToken();
 
         // Los productos solo se dan de baja (Activo = false), nunca se borran: Restrict evita perder asignaciones por accidente.
         builder.HasOne<Producto>()

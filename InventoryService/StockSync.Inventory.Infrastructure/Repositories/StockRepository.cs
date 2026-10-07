@@ -60,6 +60,15 @@ public class StockRepository : IStockRepository
         {
             await _context.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException("El stock cambió durante la operación. Consulte el saldo actual y vuelva a intentarlo.");
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+            { SqlState: PostgresErrorCodes.ForeignKeyViolation, ConstraintName: "FK_MovimientosStock_Stocks_StockId" })
+        {
+            throw new ConflictException("No se puede eliminar un stock con movimientos registrados, o el stock fue eliminado durante la operación.");
+        }
         // Dos altas concurrentes del mismo producto en la misma sucursal pueden pasar ambas la verificación previa.
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {

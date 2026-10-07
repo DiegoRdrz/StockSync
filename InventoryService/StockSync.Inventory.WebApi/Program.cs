@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using StockSync.Inventory.Application.Categorias;
 using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Application.Movimientos;
@@ -16,8 +17,13 @@ var builder = WebApplication.CreateBuilder(args.Where(arg => arg is not "--seed"
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantActual, TenantActualHttp>();
-builder.Services.AddDbContext<InventoryDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<InventoryDbContext>(options => options
+    .UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+    // Los fallos al guardar que se traducen a 409 no son errores del servidor; los inesperados ya los
+    // registra ApiExceptionHandler con su excepción completa.
+    .ConfigureWarnings(warnings => warnings.Log(
+        (CoreEventId.SaveChangesFailed, LogLevel.Debug),
+        (RelationalEventId.CommandError, LogLevel.Debug))));
 
 builder.Services.AddScoped<IProductoRepository, ProductoRepository>();
 builder.Services.AddScoped<IProductoService, ProductoService>();
@@ -30,7 +36,9 @@ builder.Services.AddScoped<IUnidadDeTrabajo, UnidadDeTrabajo>();
 builder.Services.AddScoped<ICategoriaRepository, CategoriaRepository>();
 builder.Services.AddScoped<ICategoriaService, CategoriaService>();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(ValidacionAutomatica.Configurar)
+    .AddJsonOptions(options => options.AllowInputFormatterExceptionMessages = false)
+    .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = ValidacionAutomatica.CrearRespuesta);
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();

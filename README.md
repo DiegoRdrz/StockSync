@@ -1,6 +1,21 @@
 # StockSync
 
-API de inventario con .NET 8 y PostgreSQL 15.
+API de inventario con .NET 8 y PostgreSQL 15, con un API Gateway en TypeScript/NestJS en `ApiGateway/`.
+
+## Entrada por el API Gateway
+
+Después de `docker compose up -d --build`, abre **http://localhost:9090/**.
+Swagger y sus solicitudes pasan por el gateway; el destino interno es
+`http://inventory-api:8080`. Rutas principales: `/api/inventario/productos`, `/api/inventario/categorias`,
+`/api/inventario/stock` y `/api/inventario/movimientos`.
+
+Para ejecutar el gateway fuera de Docker, consulta [ApiGateway/README.md](ApiGateway/README.md).
+El modo de desarrollo usa un tenant fijo configurado en el servidor y reemplaza
+cualquier `X-Tenant-Id` enviado por el cliente. No incluye todavía autenticación
+para resolver tenants por usuario.
+
+La API directa permanece en `http://localhost:5001` para pruebas de desarrollo.
+`GATEWAY_PORT` y `GATEWAY_TENANT_ID` se configuran en el `.env` de la raíz.
 
 ![Diagrama del proyecto](Assets/diagrama.png)
 
@@ -15,7 +30,8 @@ docker compose up -d --build
 
 La API espera a que PostgreSQL esté listo, aplica las migraciones pendientes y
 carga los datos de prueba antes de empezar a atender. Repetir el arranque no
-duplica datos. Swagger: <http://localhost:5001/swagger>.
+duplica datos. Swagger por gateway: <http://localhost:9090/swagger>.
+Acceso directo de desarrollo: <http://localhost:5001/swagger>.
 
 ```bash
 docker compose logs -f inventory-api  # Ver logs (Ctrl+C sale del visor).

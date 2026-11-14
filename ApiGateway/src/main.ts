@@ -9,6 +9,7 @@ try {
   await app.listen(config.port, config.host);
   Logger.log(`Gateway: http://${config.host}:${config.port}`, 'Bootstrap');
   Logger.log(`Inventory: ${config.upstream.origin}`, 'Bootstrap');
+  Logger.log(`Identity: ${config.identityUpstream.origin}`, 'Bootstrap');
 } catch (error) {
   Logger.error(error, 'Bootstrap');
   process.exitCode = 1;

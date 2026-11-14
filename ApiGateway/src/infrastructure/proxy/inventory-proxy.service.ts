@@ -3,7 +3,7 @@ import { sendGatewayOpenApi } from './openapi-response.js';
 import { Injectable } from '@nestjs/common';
 import type { FastifyInstance } from 'fastify';
 import httpProxy, { type FastifyHttpProxyOptions } from '@fastify/http-proxy';
-import { cleanHeaders, prepareRequestHeaders, toPublicLocation } from './proxy-headers.js';
+import { cleanHeaders, extractTenantFromAuthorization, prepareRequestHeaders, toPublicLocation } from './proxy-headers.js';
 import { GatewayConfigService } from '../configuration/gateway-config.service.js';
 
 @Injectable()
@@ -46,13 +46,17 @@ function createReplyOptions(target: URL, tenantId: string, isSwagger: boolean): 
       reply.send(response.stream);
     },
     rewriteRequestHeaders(request, original) {
+      const authHeader = original.authorization ? String(original.authorization) : undefined;
+      const tokenTenant = extractTenantFromAuthorization(authHeader);
+      const effectiveTenantId = tokenTenant || tenantId;
+
       return {
         ...prepareRequestHeaders(original, isSwagger),
         'x-request-id': request.id,
         'x-forwarded-for': request.ip,
         'x-forwarded-proto': request.protocol,
         'x-forwarded-host': request.host,
-        'x-tenant-id': tenantId,
+        'x-tenant-id': effectiveTenantId,
       };
     },
     rewriteHeaders(original, request) {

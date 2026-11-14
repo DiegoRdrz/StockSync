@@ -1,22 +1,23 @@
 import { readFileSync } from 'node:fs';
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
-  const upstream = readUpstream(env.INVENTORY_API_URL || 'http://localhost:5001');
+  const upstream = readUpstream(env.INVENTORY_API_URL || 'http://localhost:5001', 'INVENTORY_API_URL');
+  const identityUpstream = readUpstream(env.IDENTITY_API_URL || 'http://localhost:5002', 'IDENTITY_API_URL');
   const port = readPositiveInteger(env.PORT || '9090', 'PORT', 65535);
   const timeoutMs = readPositiveInteger(env.UPSTREAM_TIMEOUT_MS || '10000', 'UPSTREAM_TIMEOUT_MS', 300000);
   const tenantId = readTenantId(env.TENANT_ID || '00000000-0000-0000-0000-000000000001');
   const caPem = env.INVENTORY_CA_FILE ? readFileSync(env.INVENTORY_CA_FILE, 'utf8') : '';
 
-  return { upstream, port, timeoutMs, caPem, tenantId, host: env.HOST || '127.0.0.1' };
+  return { upstream, identityUpstream, port, timeoutMs, caPem, tenantId, host: env.HOST || '127.0.0.1' };
 }
 
-function readUpstream(value: string): URL {
+function readUpstream(value: string, varName: string = 'API_URL'): URL {
   const url = new URL(value);
   const isHttp = url.protocol === 'http:' || url.protocol === 'https:';
   const hasCredentials = Boolean(url.username || url.password);
   const hasPathOrQuery = url.pathname !== '/' || Boolean(url.search || url.hash);
   if (!isHttp || hasCredentials || hasPathOrQuery) {
-    throw new Error('INVENTORY_API_URL must be an HTTP(S) origin without credentials, path or query.');
+    throw new Error(`${varName} must be an HTTP(S) origin without credentials, path or query.`);
   }
   return url;
 }

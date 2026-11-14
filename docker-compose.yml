@@ -73,10 +73,13 @@ services:
       HOST: 0.0.0.0
       PORT: 9090
       INVENTORY_API_URL: http://inventory-api:8080
+      IDENTITY_API_URL: http://identity-api:8080
       TENANT_ID: ${GATEWAY_TENANT_ID:-00000000-0000-0000-0000-000000000001}
       UPSTREAM_TIMEOUT_MS: 10000
     depends_on:
       inventory-api:
+        condition: service_started
+      identity-api:
         condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9090/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]

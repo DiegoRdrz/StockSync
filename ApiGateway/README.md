@@ -36,13 +36,19 @@ Use `INVENTORY_API_URL=http://localhost:5001` for inventory in Docker or `http:/
 | --- | --- |
 | `/` | Redirect to `/swagger` |
 | `/health` | Gateway process status |
+| `/api/auth` and subpaths | Identity authentication (`login`, `register-tenant`, `me`) |
+| `/api/users` and subpaths | User and employee management |
+| `/api/tenants` and subpaths | Tenant company metadata |
 | `/api/inventory/products` and subpaths | Product operations |
 | `/api/inventory/categories` and subpaths | Category operations |
 | `/api/inventory/stock` and subpaths | Assignments, receipts, issues, adjustments and history |
 | `/api/inventory/movements` and subpaths | General movement listing |
 | `/swagger` and subpaths | Swagger UI and OpenAPI JSON |
 
-The gateway rewrites `/api/inventory/...` to `/api/...`. For example, `/api/inventory/products` reaches `/api/products` on InventoryService. It preserves methods, request bodies, queries and backend status codes. The backend decides which operations it supports. Legacy Spanish routes are not exposed.
+The gateway proxies requests to both `IdentityService` and `InventoryService`:
+- `/api/auth/...`, `/api/users/...`, `/api/tenants/...` reach `IdentityService`.
+- `/api/inventory/...` is rewritten to `/api/...` and reaches `InventoryService`.
+- **Dynamic Multi-Tenancy**: When a request carries `Authorization: Bearer <token>`, the gateway automatically decodes the JWT and injects the user's `X-Tenant-Id` header to `InventoryService`. Unauthenticated requests fall back to the development `TENANT_ID`.
 
 ```sh
 curl http://localhost:9090/api/inventory/products

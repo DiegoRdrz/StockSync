@@ -9,26 +9,26 @@ public class StockConfiguration : IEntityTypeConfiguration<Stock>
     public void Configure(EntityTypeBuilder<Stock> builder)
     {
         builder.ToTable("Stocks", table =>
-            table.HasCheckConstraint("CK_Stocks_Cantidad", "\"Cantidad\" >= 0"));
+            table.HasCheckConstraint("CK_Stocks_Quantity", "\"Quantity\" >= 0"));
 
         builder.HasKey(s => s.Id);
         builder.Property(s => s.Id).ValueGeneratedNever();
 
-        // Toda escritura (también el ajuste manual y el borrado) debe partir del saldo leído.
-        // EF incluye la cantidad original en el WHERE y detecta actualizaciones concurrentes.
-        builder.Property(s => s.Cantidad).IsConcurrencyToken();
+        // Every write, including manual adjustments and deletion, starts from the observed balance.
+        // EF includes the original quantity in WHERE to detect concurrent updates.
+        builder.Property(s => s.Quantity).IsConcurrencyToken();
 
-        // Los productos solo se dan de baja (Activo = false), nunca se borran: Restrict evita perder asignaciones por accidente.
-        builder.HasOne<Producto>()
+        // Products are deactivated, never deleted; Restrict prevents accidental assignment loss.
+        builder.HasOne<Product>()
             .WithMany()
-            .HasForeignKey(s => s.ProductoId)
+            .HasForeignKey(s => s.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.Property<Guid>(InventoryDbContext.TenantIdPropiedad);
+        builder.Property<Guid>(InventoryDbContext.TenantIdProperty);
 
-        // SucursalId es el identificador de una sucursal de otro servicio: sin FK ni entidad Sucursal.
-        // El producto ya pertenece a un único tenant, así que la unicidad producto-sucursal no lo necesita.
-        builder.HasIndex(s => new { s.ProductoId, s.SucursalId }).IsUnique();
-        builder.HasIndex(InventoryDbContext.TenantIdPropiedad, nameof(Stock.SucursalId));
+        // BranchId refers to another service's branch; there is no branch entity or foreign key.
+        // A product belongs to one tenant, so product/branch uniqueness does not need TenantId.
+        builder.HasIndex(s => new { s.ProductId, s.BranchId }).IsUnique();
+        builder.HasIndex(InventoryDbContext.TenantIdProperty, nameof(Stock.BranchId));
     }
 }

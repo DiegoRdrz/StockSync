@@ -8,144 +8,144 @@ namespace StockSync.Inventory.Application.Stocks;
 public class StockService : IStockService
 {
     private readonly IStockRepository _stockRepository;
-    private readonly IProductoRepository _productoRepository;
-    private readonly IMovimientoStockRepository _movimientoRepository;
-    private readonly IUnidadDeTrabajo _unidadDeTrabajo;
+    private readonly IProductRepository _productRepository;
+    private readonly IStockMovementRepository _movementRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
     public StockService(
         IStockRepository stockRepository,
-        IProductoRepository productoRepository,
-        IMovimientoStockRepository movimientoRepository,
-        IUnidadDeTrabajo unidadDeTrabajo)
+        IProductRepository productRepository,
+        IStockMovementRepository movementRepository,
+        IUnitOfWork unitOfWork)
     {
         _stockRepository = stockRepository;
-        _productoRepository = productoRepository;
-        _movimientoRepository = movimientoRepository;
-        _unidadDeTrabajo = unidadDeTrabajo;
+        _productRepository = productRepository;
+        _movementRepository = movementRepository;
+        _unitOfWork = unitOfWork;
     }
 
-    public async Task<StockResponse> CrearAsync(StockRequest request, CancellationToken cancellationToken)
+    public async Task<StockResponse> CreateAsync(StockRequest request, CancellationToken cancellationToken)
     {
-        LanzarSiHayErrores(StockValidator.Validar(request));
+        ThrowIfErrors(StockValidator.Validate(request));
 
-        // Una referencia inválida en el cuerpo es un error de validación (400), no un recurso de la URL inexistente (404).
-        if (await _productoRepository.ObtenerPorIdAsync(request.ProductoId, cancellationToken) is null)
+        // An invalid body reference is a validation error (400), not a missing URL resource (404).
+        if (await _productRepository.GetByIdAsync(request.ProductId, cancellationToken) is null)
             throw new ValidationException(new Dictionary<string, string[]>
             {
-                [nameof(StockRequest.ProductoId)] = [$"El producto '{request.ProductoId}' no existe o está dado de baja."]
+                [nameof(StockRequest.ProductId)] = [$"Product '{request.ProductId}' does not exist or is inactive."]
             });
 
-        if (await _stockRepository.ExisteAsync(request.ProductoId, request.SucursalId, cancellationToken))
+        if (await _stockRepository.ExistsAsync(request.ProductId, request.BranchId, cancellationToken))
             throw new ConflictException(
-                $"El producto '{request.ProductoId}' ya está asignado a la sucursal '{request.SucursalId}'.");
+                $"Product '{request.ProductId}' is already assigned to branch '{request.BranchId}'.");
 
-        // El saldo inicial se registra como ajuste desde 0 para que quede en el historial.
-        var stock = Stock.Crear(request.ProductoId, request.SucursalId, 0);
-        var saldoInicial = stock.ActualizarCantidad(request.Cantidad);
+        // Record the initial balance as an adjustment from zero to preserve its history.
+        var stock = Stock.Create(request.ProductId, request.BranchId, 0);
+        var initialBalance = stock.UpdateQuantity(request.Quantity);
 
-        await _stockRepository.AgregarAsync(stock, cancellationToken);
-        if (saldoInicial is not null)
-            await _movimientoRepository.AgregarAsync(saldoInicial, cancellationToken);
-        await _stockRepository.GuardarCambiosAsync(cancellationToken);
+        await _stockRepository.AddAsync(stock, cancellationToken);
+        if (initialBalance is not null)
+            await _movementRepository.AddAsync(initialBalance, cancellationToken);
+        await _stockRepository.SaveChangesAsync(cancellationToken);
 
-        return StockResponse.Desde(stock);
+        return StockResponse.From(stock);
     }
 
-    public async Task<StockResponse> ObtenerPorIdAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<StockResponse> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
-        var stock = await _stockRepository.ObtenerPorIdAsync(id, cancellationToken)
-            ?? throw StockNoEncontrado(id);
+        var stock = await _stockRepository.GetByIdAsync(id, cancellationToken)
+            ?? throw StockNotFound(id);
 
-        return StockResponse.Desde(stock);
+        return StockResponse.From(stock);
     }
 
-    public async Task<ResultadoPaginado<StockResponse>> ListarPorSucursalAsync(
-        Guid sucursalId, StockFiltro filtro, CancellationToken cancellationToken)
+    public async Task<PagedResult<StockResponse>> ListByBranchAsync(
+        Guid branchId, StockFilter filter, CancellationToken cancellationToken)
     {
-        LanzarSiHayErrores(StockValidator.Validar(filtro));
+        ThrowIfErrors(StockValidator.Validate(filter));
 
-        var (items, total) = await _stockRepository.ListarPorSucursalAsync(
-            sucursalId, Desplazamiento(filtro), filtro.TamanoPagina, cancellationToken);
+        var (items, total) = await _stockRepository.ListByBranchAsync(
+            branchId, Offset(filter), filter.PageSize, cancellationToken);
 
-        return new ResultadoPaginado<StockResponse>(
-            items.Select(StockResponse.Desde).ToList(), filtro.Pagina, filtro.TamanoPagina, total);
+        return new PagedResult<StockResponse>(
+            items.Select(StockResponse.From).ToList(), filter.Page, filter.PageSize, total);
     }
 
-    public async Task<ResultadoPaginado<StockResponse>> ListarPorProductoAsync(
-        Guid productoId, StockFiltro filtro, CancellationToken cancellationToken)
+    public async Task<PagedResult<StockResponse>> ListByProductAsync(
+        Guid productId, StockFilter filter, CancellationToken cancellationToken)
     {
-        LanzarSiHayErrores(StockValidator.Validar(filtro));
+        ThrowIfErrors(StockValidator.Validate(filter));
 
-        if (await _productoRepository.ObtenerPorIdAsync(productoId, cancellationToken) is null)
-            throw new NotFoundException($"No se encontró el producto con id '{productoId}'.");
+        if (await _productRepository.GetByIdAsync(productId, cancellationToken) is null)
+            throw new NotFoundException($"Product '{productId}' was not found.");
 
-        var (items, total) = await _stockRepository.ListarPorProductoAsync(
-            productoId, Desplazamiento(filtro), filtro.TamanoPagina, cancellationToken);
+        var (items, total) = await _stockRepository.ListByProductAsync(
+            productId, Offset(filter), filter.PageSize, cancellationToken);
 
-        return new ResultadoPaginado<StockResponse>(
-            items.Select(StockResponse.Desde).ToList(), filtro.Pagina, filtro.TamanoPagina, total);
+        return new PagedResult<StockResponse>(
+            items.Select(StockResponse.From).ToList(), filter.Page, filter.PageSize, total);
     }
 
-    public async Task<ResultadoPaginado<StockBajoMinimoResponse>> ListarBajoMinimoAsync(
-        StockBajoMinimoFiltro filtro, CancellationToken cancellationToken)
+    public async Task<PagedResult<LowStockResponse>> ListLowStockAsync(
+        LowStockFilter filter, CancellationToken cancellationToken)
     {
-        LanzarSiHayErrores(StockValidator.Validar(filtro));
+        ThrowIfErrors(StockValidator.Validate(filter));
 
-        var (items, total) = await _stockRepository.ListarBajoMinimoAsync(
-            filtro.SucursalId, Desplazamiento(filtro), filtro.TamanoPagina, cancellationToken);
+        var (items, total) = await _stockRepository.ListLowStockAsync(
+            filter.BranchId, Offset(filter), filter.PageSize, cancellationToken);
 
-        return new ResultadoPaginado<StockBajoMinimoResponse>(
-            items.Select(StockBajoMinimoResponse.Desde).ToList(), filtro.Pagina, filtro.TamanoPagina, total);
+        return new PagedResult<LowStockResponse>(
+            items.Select(LowStockResponse.From).ToList(), filter.Page, filter.PageSize, total);
     }
 
-    public Task<StockResponse> ActualizarCantidadAsync(Guid id, StockCantidadRequest request, CancellationToken cancellationToken)
+    public Task<StockResponse> UpdateQuantityAsync(Guid id, StockQuantityRequest request, CancellationToken cancellationToken)
     {
-        LanzarSiHayErrores(StockValidator.Validar(request));
+        ThrowIfErrors(StockValidator.Validate(request));
 
-        return _unidadDeTrabajo.EjecutarEnTransaccionAsync(async () =>
+        return _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            var stock = await _stockRepository.ObtenerParaActualizarAsync(id, cancellationToken)
-                ?? throw StockNoEncontrado(id);
-            await AsegurarProductoActivoAsync(stock.ProductoId, cancellationToken);
+            var stock = await _stockRepository.GetForUpdateAsync(id, cancellationToken)
+                ?? throw StockNotFound(id);
+            await EnsureActiveProductAsync(stock.ProductId, cancellationToken);
 
-            var ajuste = stock.ActualizarCantidad(request.NuevaCantidad);
-            if (ajuste is not null)
-                await _movimientoRepository.AgregarAsync(ajuste, cancellationToken);
-            await _stockRepository.GuardarCambiosAsync(cancellationToken);
+            var adjustment = stock.UpdateQuantity(request.NewQuantity);
+            if (adjustment is not null)
+                await _movementRepository.AddAsync(adjustment, cancellationToken);
+            await _stockRepository.SaveChangesAsync(cancellationToken);
 
-            return StockResponse.Desde(stock);
+            return StockResponse.From(stock);
         }, cancellationToken);
     }
 
-    // Solo elimina la asignación a la sucursal; el producto no se toca.
-    public Task EliminarAsync(Guid id, CancellationToken cancellationToken) =>
-        _unidadDeTrabajo.EjecutarEnTransaccionAsync(async () =>
+    // Delete only the branch assignment; leave the product unchanged.
+    public Task DeleteAsync(Guid id, CancellationToken cancellationToken) =>
+        _unitOfWork.ExecuteInTransactionAsync(async () =>
         {
-            var stock = await _stockRepository.ObtenerParaActualizarAsync(id, cancellationToken)
-                ?? throw StockNoEncontrado(id);
+            var stock = await _stockRepository.GetForUpdateAsync(id, cancellationToken)
+                ?? throw StockNotFound(id);
 
-            // Borrar una asignación con unidades las haría desaparecer sin ningún movimiento que lo explique.
-            if (stock.Cantidad > 0)
-                throw new ConflictException("No se puede eliminar la asignación porque tiene existencias.");
+            // Deleting an assignment with units would erase stock without an explanatory movement.
+            if (stock.Quantity > 0)
+                throw new ConflictException("Cannot delete the assignment because it has stock.");
 
-            _stockRepository.Eliminar(stock);
-            await _stockRepository.GuardarCambiosAsync(cancellationToken);
+            _stockRepository.Delete(stock);
+            await _stockRepository.SaveChangesAsync(cancellationToken);
         }, cancellationToken);
 
-    private async Task AsegurarProductoActivoAsync(Guid productoId, CancellationToken cancellationToken)
+    private async Task EnsureActiveProductAsync(Guid productId, CancellationToken cancellationToken)
     {
-        if (await _productoRepository.ObtenerPorIdAsync(productoId, cancellationToken) is null)
-            throw new ConflictException($"El producto '{productoId}' está dado de baja; su stock no admite cambios.");
+        if (await _productRepository.GetByIdAsync(productId, cancellationToken) is null)
+            throw new ConflictException($"Product '{productId}' is inactive; its stock cannot be changed.");
     }
 
-    private static int Desplazamiento(StockFiltro filtro) => (filtro.Pagina - 1) * filtro.TamanoPagina;
+    private static int Offset(StockFilter filter) => (filter.Page - 1) * filter.PageSize;
 
-    private static void LanzarSiHayErrores(Dictionary<string, string[]> errores)
+    private static void ThrowIfErrors(Dictionary<string, string[]> errors)
     {
-        if (errores.Count > 0)
-            throw new ValidationException(errores);
+        if (errors.Count > 0)
+            throw new ValidationException(errors);
     }
 
-    private static NotFoundException StockNoEncontrado(Guid id) =>
-        new($"No se encontró el stock con id '{id}'.");
+    private static NotFoundException StockNotFound(Guid id) =>
+        new($"Stock '{id}' was not found.");
 }

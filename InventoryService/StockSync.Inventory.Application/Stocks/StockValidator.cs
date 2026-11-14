@@ -2,57 +2,57 @@ namespace StockSync.Inventory.Application.Stocks;
 
 public static class StockValidator
 {
-    public static Dictionary<string, string[]> Validar(StockRequest request)
+    public static Dictionary<string, string[]> Validate(StockRequest request)
     {
-        var errores = new Dictionary<string, List<string>>();
+        var errors = new Dictionary<string, List<string>>();
 
-        if (request.ProductoId == Guid.Empty)
-            Agregar(errores, nameof(request.ProductoId), "El producto es obligatorio.");
+        if (request.ProductId == Guid.Empty)
+            Add(errors, nameof(request.ProductId), "Product is required.");
 
-        if (request.SucursalId == Guid.Empty)
-            Agregar(errores, nameof(request.SucursalId), "La sucursal es obligatoria.");
+        if (request.BranchId == Guid.Empty)
+            Add(errors, nameof(request.BranchId), "Branch is required.");
 
-        if (request.Cantidad < 0)
-            Agregar(errores, nameof(request.Cantidad), "La cantidad no puede ser negativa.");
+        if (request.Quantity < 0)
+            Add(errors, nameof(request.Quantity), "Quantity cannot be negative.");
 
-        return Convertir(errores);
+        return Convert(errors);
     }
 
-    public static Dictionary<string, string[]> Validar(StockCantidadRequest request)
+    public static Dictionary<string, string[]> Validate(StockQuantityRequest request)
     {
-        var errores = new Dictionary<string, List<string>>();
+        var errors = new Dictionary<string, List<string>>();
 
-        if (request.NuevaCantidad < 0)
-            Agregar(errores, nameof(request.NuevaCantidad), "La cantidad no puede ser negativa.");
+        if (request.NewQuantity < 0)
+            Add(errors, nameof(request.NewQuantity), "Quantity cannot be negative.");
 
-        return Convertir(errores);
+        return Convert(errors);
     }
 
-    public static Dictionary<string, string[]> Validar(StockFiltro filtro)
+    public static Dictionary<string, string[]> Validate(StockFilter filter)
     {
-        var errores = new Dictionary<string, List<string>>();
+        var errors = new Dictionary<string, List<string>>();
 
-        if (filtro.Pagina < 1)
-            Agregar(errores, nameof(filtro.Pagina), "La página debe ser mayor o igual a 1.");
+        if (filter.Page < 1)
+            Add(errors, nameof(filter.Page), "Page must be at least 1.");
 
-        if (filtro.TamanoPagina < 1 || filtro.TamanoPagina > StockFiltro.TamanoPaginaMaximo)
-            Agregar(errores, nameof(filtro.TamanoPagina), $"El tamaño de página debe estar entre 1 y {StockFiltro.TamanoPaginaMaximo}.");
+        if (filter.PageSize < 1 || filter.PageSize > StockFilter.MaxPageSize)
+            Add(errors, nameof(filter.PageSize), $"Page size must be between 1 and {StockFilter.MaxPageSize}.");
 
-        // El desplazamiento (Pagina - 1) * TamanoPagina se calcula en int y no debe desbordarse.
-        if (filtro.Pagina > 0 && filtro.TamanoPagina > 0 &&
-            (long)(filtro.Pagina - 1) * filtro.TamanoPagina > int.MaxValue)
-            Agregar(errores, nameof(filtro.Pagina), "La página solicitada excede el límite permitido.");
+        // The offset (Page - 1) * PageSize is an int and must not overflow.
+        if (filter.Page > 0 && filter.PageSize > 0 &&
+            (long)(filter.Page - 1) * filter.PageSize > int.MaxValue)
+            Add(errors, nameof(filter.Page), "The requested page exceeds the allowed limit.");
 
-        return Convertir(errores);
+        return Convert(errors);
     }
 
-    private static void Agregar(Dictionary<string, List<string>> errores, string campo, string mensaje)
+    private static void Add(Dictionary<string, List<string>> errors, string field, string message)
     {
-        if (!errores.TryGetValue(campo, out var mensajes))
-            errores[campo] = mensajes = [];
-        mensajes.Add(mensaje);
+        if (!errors.TryGetValue(field, out var messages))
+            errors[field] = messages = [];
+        messages.Add(message);
     }
 
-    private static Dictionary<string, string[]> Convertir(Dictionary<string, List<string>> errores) =>
-        errores.ToDictionary(e => e.Key, e => e.Value.ToArray());
+    private static Dictionary<string, string[]> Convert(Dictionary<string, List<string>> errors) =>
+        errors.ToDictionary(e => e.Key, e => e.Value.ToArray());
 }

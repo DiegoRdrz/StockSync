@@ -4,20 +4,20 @@ namespace StockSync.Inventory.Application.Stocks;
 
 public interface IStockService
 {
-    Task<StockResponse> CrearAsync(StockRequest request, CancellationToken cancellationToken);
+    Task<StockResponse> CreateAsync(StockRequest request, CancellationToken cancellationToken);
 
-    Task<StockResponse> ObtenerPorIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<StockResponse> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<ResultadoPaginado<StockResponse>> ListarPorSucursalAsync(
-        Guid sucursalId, StockFiltro filtro, CancellationToken cancellationToken);
+    Task<PagedResult<StockResponse>> ListByBranchAsync(
+        Guid branchId, StockFilter filter, CancellationToken cancellationToken);
 
-    Task<ResultadoPaginado<StockResponse>> ListarPorProductoAsync(
-        Guid productoId, StockFiltro filtro, CancellationToken cancellationToken);
+    Task<PagedResult<StockResponse>> ListByProductAsync(
+        Guid productId, StockFilter filter, CancellationToken cancellationToken);
 
-    Task<ResultadoPaginado<StockBajoMinimoResponse>> ListarBajoMinimoAsync(
-        StockBajoMinimoFiltro filtro, CancellationToken cancellationToken);
+    Task<PagedResult<LowStockResponse>> ListLowStockAsync(
+        LowStockFilter filter, CancellationToken cancellationToken);
 
-    Task<StockResponse> ActualizarCantidadAsync(Guid id, StockCantidadRequest request, CancellationToken cancellationToken);
+    Task<StockResponse> UpdateQuantityAsync(Guid id, StockQuantityRequest request, CancellationToken cancellationToken);
 
-    Task EliminarAsync(Guid id, CancellationToken cancellationToken);
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken);
 }

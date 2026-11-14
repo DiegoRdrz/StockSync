@@ -4,28 +4,28 @@ namespace StockSync.Inventory.Domain.Repositories;
 
 public interface IStockRepository
 {
-    Task<Stock?> ObtenerPorIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<Stock?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
-    // Bloquea la fila hasta que termine la transacción en curso (ver IUnidadDeTrabajo): las operaciones
-    // concurrentes sobre el mismo stock esperan su turno y leen el saldo ya confirmado.
-    Task<Stock?> ObtenerParaActualizarAsync(Guid id, CancellationToken cancellationToken);
+    // Lock the row until the current transaction ends (see IUnitOfWork).
+    // Concurrent operations on the same stock wait and read the committed balance.
+    Task<Stock?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken);
 
-    // Excluye los stocks de productos dados de baja.
-    Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorSucursalAsync(
-        Guid sucursalId, int skip, int take, CancellationToken cancellationToken);
+    // Exclude stock belonging to inactive products.
+    Task<(IReadOnlyList<Stock> Items, int Total)> ListByBranchAsync(
+        Guid branchId, int skip, int take, CancellationToken cancellationToken);
 
-    Task<(IReadOnlyList<Stock> Items, int Total)> ListarPorProductoAsync(
-        Guid productoId, int skip, int take, CancellationToken cancellationToken);
+    Task<(IReadOnlyList<Stock> Items, int Total)> ListByProductAsync(
+        Guid productId, int skip, int take, CancellationToken cancellationToken);
 
-    // Stocks de productos activos con Cantidad < StockMinimo, de mayor a menor faltante.
-    Task<(IReadOnlyList<StockBajoMinimoDetalle> Items, int Total)> ListarBajoMinimoAsync(
-        Guid? sucursalId, int skip, int take, CancellationToken cancellationToken);
+    // Active-product stock below MinimumStock, ordered by descending shortage.
+    Task<(IReadOnlyList<LowStockDetail> Items, int Total)> ListLowStockAsync(
+        Guid? branchId, int skip, int take, CancellationToken cancellationToken);
 
-    Task<bool> ExisteAsync(Guid productoId, Guid sucursalId, CancellationToken cancellationToken);
+    Task<bool> ExistsAsync(Guid productId, Guid branchId, CancellationToken cancellationToken);
 
-    Task AgregarAsync(Stock stock, CancellationToken cancellationToken);
+    Task AddAsync(Stock stock, CancellationToken cancellationToken);
 
-    void Eliminar(Stock stock);
+    void Delete(Stock stock);
 
-    Task GuardarCambiosAsync(CancellationToken cancellationToken);
+    Task SaveChangesAsync(CancellationToken cancellationToken);
 }

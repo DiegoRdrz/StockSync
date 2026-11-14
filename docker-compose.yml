@@ -30,5 +30,40 @@ services:
       inventory-db:
         condition: service_healthy
 
+  identity-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stock1234}
+      POSTGRES_DB: stocksync_identity
+    ports:
+      - "5433:5432"
+    volumes:
+      - identity_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stocksync_identity"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  identity-api:
+    build:
+      context: ./IdentityService
+      dockerfile: StockSync.Identity.WebApi/Dockerfile
+    ports:
+      - "5002:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=identity-db;Database=stocksync_identity;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
+      - Initialization__ApplyMigrations=true
+      - Initialization__LoadDemoData=${CARGAR_DATOS_DEMO:-true}
+      - Jwt__Issuer=StockSync.Identity
+      - Jwt__Audience=StockSync.Ecosystem
+      - Jwt__SecretKey=${JWT_SECRET_KEY:-StockSyncSuperSecretSecureKey123456789!NeverShareInProduction!}
+    depends_on:
+      identity-db:
+        condition: service_healthy
+
 volumes:
   inventory_data:
+  identity_data:

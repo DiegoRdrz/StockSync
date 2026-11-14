@@ -1,6 +1,17 @@
 # StockSync
 
-API de inventario con .NET 8 y PostgreSQL 15.
+Plataforma SaaS de gestión de inventario y pedidos con microservicios en **.NET 8** y **PostgreSQL 15**.
+
+## Microservicios disponibles
+
+| Microservicio | Puerto Docker | Swagger | Idioma |
+|---|---|---|---|
+| **Inventory Service** | `5001` | <http://localhost:5001/swagger> | Español (en proceso de traducción) |
+| **Identity Service** | `5002` | <http://localhost:5002/swagger> | **Inglés** (100% implementado) |
+
+Para documentación detallada de cada servicio:
+- [Inventory Service Documentation](file:///InventoryService/README.md)
+- [Identity Service Documentation (English)](file:///IdentityService/README.md)
 
 ## Ejecutar con Docker (sin instalar .NET ni PostgreSQL)
 

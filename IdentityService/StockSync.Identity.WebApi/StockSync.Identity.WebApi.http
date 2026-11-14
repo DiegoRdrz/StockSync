@@ -1,0 +1,52 @@
+@baseUrl = http://localhost:5042
+
+### 1. Register a new tenant (Company & Owner)
+POST {{baseUrl}}/api/auth/register-tenant
+Content-Type: application/json
+
+{
+  "companyName": "Acme Tools & Supplies",
+  "taxId": "TAX-998877",
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john.doe@acme.com",
+  "password": "Password123!"
+}
+
+### 2. Login as Demo Owner
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "owner@stocksync.demo",
+  "password": "Password123!"
+}
+
+> {%
+  client.global.set("authToken", response.body.accessToken);
+%}
+
+### 3. Get Current User & Tenant Profile
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{authToken}}
+
+### 4. Create an Employee User (Owner only)
+POST {{baseUrl}}/api/users
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Jane",
+  "lastName": "Smith",
+  "email": "jane.smith@stocksync.demo",
+  "password": "Password123!",
+  "role": 2
+}
+
+### 5. List Users in Current Tenant
+GET {{baseUrl}}/api/users?page=1&pageSize=10
+Authorization: Bearer {{authToken}}
+
+### 6. Get Current Tenant Details
+GET {{baseUrl}}/api/tenants/current
+Authorization: Bearer {{authToken}}

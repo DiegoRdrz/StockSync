@@ -4,67 +4,67 @@ namespace StockSync.Inventory.UnitTests.Application;
 
 public class StockValidatorTests
 {
-    private static readonly StockRequest RequestValido = new(Guid.NewGuid(), Guid.NewGuid(), 20);
+    private static readonly StockRequest ValidRequest = new(Guid.NewGuid(), Guid.NewGuid(), 20);
 
     [Fact]
-    public void Validar_RequestValido_NoDevuelveErrores()
+    public void Validate_ValidRequest_ReturnsNoErrors()
     {
-        Assert.Empty(StockValidator.Validar(RequestValido));
+        Assert.Empty(StockValidator.Validate(ValidRequest));
     }
 
     [Fact]
-    public void Validar_CantidadEnCero_EsValido()
+    public void Validate_ZeroQuantity_IsValid()
     {
-        Assert.Empty(StockValidator.Validar(RequestValido with { Cantidad = 0 }));
+        Assert.Empty(StockValidator.Validate(ValidRequest with { Quantity = 0 }));
     }
 
     [Fact]
-    public void Validar_RequestInvalido_DevuelveTodosLosErroresPorCampo()
+    public void Validate_InvalidRequest_ReturnsAllFieldErrors()
     {
         var request = new StockRequest(Guid.Empty, Guid.Empty, -1);
 
-        var errores = StockValidator.Validar(request);
+        var errors = StockValidator.Validate(request);
 
         Assert.Equal(
             new[]
             {
-                nameof(StockRequest.ProductoId),
-                nameof(StockRequest.SucursalId),
-                nameof(StockRequest.Cantidad)
+                nameof(StockRequest.ProductId),
+                nameof(StockRequest.BranchId),
+                nameof(StockRequest.Quantity)
             }.Order(),
-            errores.Keys.Order());
+            errors.Keys.Order());
     }
 
     [Fact]
-    public void Validar_CantidadRequestValido_NoDevuelveErrores()
+    public void Validate_ValidQuantityRequest_ReturnsNoErrors()
     {
-        Assert.Empty(StockValidator.Validar(new StockCantidadRequest(0)));
-        Assert.Empty(StockValidator.Validar(new StockCantidadRequest(10)));
+        Assert.Empty(StockValidator.Validate(new StockQuantityRequest(0)));
+        Assert.Empty(StockValidator.Validate(new StockQuantityRequest(10)));
     }
 
     [Theory]
-    [InlineData(0, 20, nameof(StockFiltro.Pagina))]
-    [InlineData(1, 0, nameof(StockFiltro.TamanoPagina))]
-    [InlineData(1, StockFiltro.TamanoPaginaMaximo + 1, nameof(StockFiltro.TamanoPagina))]
-    [InlineData(int.MaxValue, 20, nameof(StockFiltro.Pagina))]
-    public void Validar_FiltroInvalido_DevuelveError(int pagina, int tamanoPagina, string campo)
+    [InlineData(0, 20, nameof(StockFilter.Page))]
+    [InlineData(1, 0, nameof(StockFilter.PageSize))]
+    [InlineData(1, StockFilter.MaxPageSize + 1, nameof(StockFilter.PageSize))]
+    [InlineData(int.MaxValue, 20, nameof(StockFilter.Page))]
+    public void Validate_InvalidFilter_ReturnsError(int page, int pageSize, string field)
     {
-        var filtro = new StockBajoMinimoFiltro { Pagina = pagina, TamanoPagina = tamanoPagina };
+        var filter = new LowStockFilter { Page = page, PageSize = pageSize };
 
-        Assert.Contains(campo, StockValidator.Validar(filtro).Keys);
+        Assert.Contains(field, StockValidator.Validate(filter).Keys);
     }
 
     [Fact]
-    public void Validar_FiltroPorDefecto_NoDevuelveErrores()
+    public void Validate_DefaultFilter_ReturnsNoErrors()
     {
-        Assert.Empty(StockValidator.Validar(new StockFiltro()));
+        Assert.Empty(StockValidator.Validate(new StockFilter()));
     }
 
     [Fact]
-    public void Validar_CantidadRequestNegativo_DevuelveError()
+    public void Validate_NegativeQuantityRequest_ReturnsError()
     {
-        var errores = StockValidator.Validar(new StockCantidadRequest(-1));
+        var errors = StockValidator.Validate(new StockQuantityRequest(-1));
 
-        Assert.Contains(nameof(StockCantidadRequest.NuevaCantidad), errores.Keys);
+        Assert.Contains(nameof(StockQuantityRequest.NewQuantity), errors.Keys);
     }
 }

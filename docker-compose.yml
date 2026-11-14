@@ -24,8 +24,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=inventory-db;Database=stocksync_inventory;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
-      - Inicializacion__AplicarMigraciones=true
-      - Inicializacion__CargarDatosDemo=${CARGAR_DATOS_DEMO:-true}
+      - Initialization__ApplyMigrations=true
+      - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-true}
     depends_on:
       inventory-db:
         condition: service_healthy

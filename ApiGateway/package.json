@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "API gateway de StockSync con NestJS y TypeScript",
+  "description": "StockSync API gateway with NestJS and TypeScript",
   "engines": {
     "node": ">=24"
   },

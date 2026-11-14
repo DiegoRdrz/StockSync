@@ -5,108 +5,108 @@ namespace StockSync.Inventory.UnitTests.Domain;
 
 public class StockTests
 {
-    private static Stock CrearValido(Guid? productoId = null, Guid? sucursalId = null, int cantidad = 20) =>
-        Stock.Crear(productoId ?? Guid.NewGuid(), sucursalId ?? Guid.NewGuid(), cantidad);
+    private static Stock CreateValid(Guid? productId = null, Guid? branchId = null, int quantity = 20) =>
+        Stock.Create(productId ?? Guid.NewGuid(), branchId ?? Guid.NewGuid(), quantity);
 
     [Fact]
-    public void Crear_ConDatosValidos_InicializaStock()
+    public void Create_WithValidData_InitializesStock()
     {
-        var productoId = Guid.NewGuid();
-        var sucursalId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var branchId = Guid.NewGuid();
 
-        var stock = CrearValido(productoId, sucursalId, 20);
+        var stock = CreateValid(productId, branchId, 20);
 
         Assert.NotEqual(Guid.Empty, stock.Id);
-        Assert.Equal(productoId, stock.ProductoId);
-        Assert.Equal(sucursalId, stock.SucursalId);
-        Assert.Equal(20, stock.Cantidad);
+        Assert.Equal(productId, stock.ProductId);
+        Assert.Equal(branchId, stock.BranchId);
+        Assert.Equal(20, stock.Quantity);
     }
 
     [Fact]
-    public void Crear_ConCantidadEnCero_EsValido()
+    public void Create_WithZeroQuantity_IsValid()
     {
-        var stock = CrearValido(cantidad: 0);
+        var stock = CreateValid(quantity: 0);
 
-        Assert.Equal(0, stock.Cantidad);
+        Assert.Equal(0, stock.Quantity);
     }
 
     [Fact]
-    public void Crear_ConCantidadNegativa_LanzaDomainException()
+    public void Create_WithNegativeQuantity_ThrowsDomainException()
     {
-        Assert.Throws<DomainException>(() => CrearValido(cantidad: -1));
+        Assert.Throws<DomainException>(() => CreateValid(quantity: -1));
     }
 
     [Fact]
-    public void Crear_ConProductoVacio_LanzaDomainException()
+    public void Create_WithEmptyProduct_ThrowsDomainException()
     {
-        Assert.Throws<DomainException>(() => CrearValido(productoId: Guid.Empty));
+        Assert.Throws<DomainException>(() => CreateValid(productId: Guid.Empty));
     }
 
     [Fact]
-    public void Crear_ConSucursalVacia_LanzaDomainException()
+    public void Create_WithEmptyBranch_ThrowsDomainException()
     {
-        Assert.Throws<DomainException>(() => CrearValido(sucursalId: Guid.Empty));
+        Assert.Throws<DomainException>(() => CreateValid(branchId: Guid.Empty));
     }
 
     [Fact]
-    public void ActualizarCantidad_ConCantidadValida_ModificaSoloLaCantidad()
+    public void UpdateQuantity_WithValidQuantity_UpdatesOnlyQuantity()
     {
-        var stock = CrearValido(cantidad: 20);
+        var stock = CreateValid(quantity: 20);
         var id = stock.Id;
-        var productoId = stock.ProductoId;
-        var sucursalId = stock.SucursalId;
+        var productId = stock.ProductId;
+        var branchId = stock.BranchId;
 
-        stock.ActualizarCantidad(5);
+        stock.UpdateQuantity(5);
 
-        Assert.Equal(5, stock.Cantidad);
+        Assert.Equal(5, stock.Quantity);
         Assert.Equal(id, stock.Id);
-        Assert.Equal(productoId, stock.ProductoId);
-        Assert.Equal(sucursalId, stock.SucursalId);
+        Assert.Equal(productId, stock.ProductId);
+        Assert.Equal(branchId, stock.BranchId);
     }
 
     [Fact]
-    public void ActualizarCantidad_ConCantidadEnCero_EsValido()
+    public void UpdateQuantity_WithZeroQuantity_IsValid()
     {
-        var stock = CrearValido(cantidad: 20);
+        var stock = CreateValid(quantity: 20);
 
-        stock.ActualizarCantidad(0);
+        stock.UpdateQuantity(0);
 
-        Assert.Equal(0, stock.Cantidad);
+        Assert.Equal(0, stock.Quantity);
     }
 
     [Theory]
     [InlineData(20, 35, 15)]
     [InlineData(20, 5, 15)]
     [InlineData(0, 12, 12)]
-    public void ActualizarCantidad_RegistraAjusteConSaldosAnteriorYPosterior(int inicial, int nueva, int diferencia)
+    public void UpdateQuantity_RecordsAdjustmentWithPreviousAndNewBalances(int initial, int updated, int difference)
     {
-        var stock = CrearValido(cantidad: inicial);
+        var stock = CreateValid(quantity: initial);
 
-        var ajuste = stock.ActualizarCantidad(nueva);
+        var adjustment = stock.UpdateQuantity(updated);
 
-        Assert.NotNull(ajuste);
-        Assert.Equal(TipoMovimientoStock.Ajuste, ajuste.Tipo);
-        Assert.Equal(stock.Id, ajuste.StockId);
-        Assert.Equal(diferencia, ajuste.Cantidad);
-        Assert.Equal(inicial, ajuste.CantidadAnterior);
-        Assert.Equal(nueva, ajuste.CantidadPosterior);
+        Assert.NotNull(adjustment);
+        Assert.Equal(StockMovementType.Adjustment, adjustment.Type);
+        Assert.Equal(stock.Id, adjustment.StockId);
+        Assert.Equal(difference, adjustment.Quantity);
+        Assert.Equal(initial, adjustment.PreviousQuantity);
+        Assert.Equal(updated, adjustment.NewQuantity);
     }
 
     [Fact]
-    public void ActualizarCantidad_SinCambio_NoRegistraAjuste()
+    public void UpdateQuantity_Unchanged_DoesNotRecordAdjustment()
     {
-        var stock = CrearValido(cantidad: 20);
+        var stock = CreateValid(quantity: 20);
 
-        Assert.Null(stock.ActualizarCantidad(20));
-        Assert.Equal(20, stock.Cantidad);
+        Assert.Null(stock.UpdateQuantity(20));
+        Assert.Equal(20, stock.Quantity);
     }
 
     [Fact]
-    public void ActualizarCantidad_ConCantidadNegativa_LanzaDomainExceptionYNoModifica()
+    public void UpdateQuantity_WithNegativeQuantity_ThrowsDomainExceptionWithoutModification()
     {
-        var stock = CrearValido(cantidad: 20);
+        var stock = CreateValid(quantity: 20);
 
-        Assert.Throws<DomainException>(() => stock.ActualizarCantidad(-1));
-        Assert.Equal(20, stock.Cantidad);
+        Assert.Throws<DomainException>(() => stock.UpdateQuantity(-1));
+        Assert.Equal(20, stock.Quantity);
     }
 }

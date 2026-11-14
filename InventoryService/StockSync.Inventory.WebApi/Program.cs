@@ -1,77 +1,77 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using StockSync.Inventory.Application.Categorias;
+using StockSync.Inventory.Application.Categories;
 using StockSync.Inventory.Application.Common;
-using StockSync.Inventory.Application.Movimientos;
-using StockSync.Inventory.Application.Productos;
+using StockSync.Inventory.Application.Movements;
+using StockSync.Inventory.Application.Products;
 using StockSync.Inventory.Application.Stocks;
 using StockSync.Inventory.Domain.Repositories;
 using StockSync.Inventory.Infrastructure;
 using StockSync.Inventory.Infrastructure.Repositories;
 using StockSync.Inventory.WebApi.ExceptionHandling;
-using StockSync.Inventory.WebApi.Multitenencia;
+using StockSync.Inventory.WebApi.Multitenancy;
 
-var ejecutarSemilla = args.Contains("--seed");
-var ejecutarMigraciones = args.Contains("--migrate");
+var runSeed = args.Contains("--seed");
+var runMigrations = args.Contains("--migrate");
 var builder = WebApplication.CreateBuilder(args.Where(arg => arg is not "--seed" and not "--migrate").ToArray());
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ITenantActual, TenantActualHttp>();
+builder.Services.AddScoped<ICurrentTenant, HttpCurrentTenant>();
 builder.Services.AddDbContext<InventoryDbContext>(options => options
     .UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
-    // Los fallos al guardar que se traducen a 409 no son errores del servidor; los inesperados ya los
-    // registra ApiExceptionHandler con su excepción completa.
+    // Save failures mapped to 409 are not server errors; unexpected failures
+    // are logged with their complete exception by ApiExceptionHandler.
     .ConfigureWarnings(warnings => warnings.Log(
         (CoreEventId.SaveChangesFailed, LogLevel.Debug),
         (RelationalEventId.CommandError, LogLevel.Debug))));
 
-builder.Services.AddScoped<IProductoRepository, ProductoRepository>();
-builder.Services.AddScoped<IProductoService, ProductoService>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IStockRepository, StockRepository>();
 builder.Services.AddScoped<IStockService, StockService>();
-builder.Services.AddScoped<IMovimientoStockRepository, MovimientoStockRepository>();
-builder.Services.AddScoped<IMovimientoStockService, MovimientoStockService>();
-builder.Services.AddScoped<IUnidadDeTrabajo, UnidadDeTrabajo>();
+builder.Services.AddScoped<IStockMovementRepository, StockMovementRepository>();
+builder.Services.AddScoped<IStockMovementService, StockMovementService>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
-builder.Services.AddScoped<ICategoriaRepository, CategoriaRepository>();
-builder.Services.AddScoped<ICategoriaService, CategoriaService>();
+builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
 
-builder.Services.AddControllers(ValidacionAutomatica.Configurar)
+builder.Services.AddControllers(AutomaticValidation.Configure)
     .AddJsonOptions(options => options.AllowInputFormatterExceptionMessages = false)
-    .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = ValidacionAutomatica.CrearRespuesta);
+    .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = AutomaticValidation.CreateResponse);
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddProblemDetails();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options => options.OperationFilter<EncabezadoTenantOperationFilter>());
+builder.Services.AddSwaggerGen(options => options.OperationFilter<TenantHeaderOperationFilter>());
 
 var app = builder.Build();
 
-// --migrate y --seed preparan la base y terminan. Con Inicializacion:* (activado en la imagen de Docker)
-// la base se prepara al arrancar y la API sigue en marcha.
-var aplicarMigraciones = ejecutarMigraciones || app.Configuration.GetValue<bool>("Inicializacion:AplicarMigraciones");
-var cargarDatosDemo = ejecutarSemilla || app.Configuration.GetValue<bool>("Inicializacion:CargarDatosDemo");
+// --migrate and --seed prepare the database and exit. Initialization settings in Docker
+// prepare the database at startup and keep the API running.
+var applyMigrations = runMigrations || app.Configuration.GetValue<bool>("Initialization:ApplyMigrations");
+var loadDemoData = runSeed || app.Configuration.GetValue<bool>("Initialization:LoadDemoData");
 
-if (aplicarMigraciones || cargarDatosDemo)
+if (applyMigrations || loadDemoData)
 {
-    if (cargarDatosDemo && !app.Environment.IsDevelopment())
-        throw new InvalidOperationException("Los datos de demostración solo se pueden cargar en Development.");
+    if (loadDemoData && !app.Environment.IsDevelopment())
+        throw new InvalidOperationException("Demo data can only be loaded in Development.");
 
     await using var scope = app.Services.CreateAsyncScope();
     var context = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
-    if (aplicarMigraciones)
+    if (applyMigrations)
     {
         await context.Database.MigrateAsync();
-        app.Logger.LogInformation("Migraciones completadas.");
+        app.Logger.LogInformation("Migrations completed.");
     }
-    if (cargarDatosDemo)
+    if (loadDemoData)
     {
         await InventoryDbSeeder.SeedAsync(context);
-        app.Logger.LogInformation("Semilla completada. Consulte los IDs en /api/productos y /api/stock/sucursal/{SucursalId}.",
+        app.Logger.LogInformation("Seeding completed. Check IDs at /api/products and /api/stock/branch/{BranchId}.",
             "11111111-1111-1111-1111-111111111111");
     }
 }
 
-if (ejecutarSemilla || ejecutarMigraciones)
+if (runSeed || runMigrations)
     return;
 
 app.UseExceptionHandler();
@@ -84,7 +84,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseMiddleware<ResolucionTenantMiddleware>();
+app.UseMiddleware<TenantResolutionMiddleware>();
 app.MapControllers();
 
 app.Run();

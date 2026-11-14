@@ -20,63 +20,63 @@ public class StockController : ControllerBase
     [ProducesResponseType(typeof(StockResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<StockResponse>> Crear(StockRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<StockResponse>> Create(StockRequest request, CancellationToken cancellationToken)
     {
-        var stock = await _stockService.CrearAsync(request, cancellationToken);
-        return CreatedAtAction(nameof(ObtenerPorId), new { id = stock.Id }, stock);
+        var stock = await _stockService.CreateAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = stock.Id }, stock);
     }
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(StockResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<StockResponse>> ObtenerPorId(Guid id, CancellationToken cancellationToken) =>
-        Ok(await _stockService.ObtenerPorIdAsync(id, cancellationToken));
+    public async Task<ActionResult<StockResponse>> GetById(Guid id, CancellationToken cancellationToken) =>
+        Ok(await _stockService.GetByIdAsync(id, cancellationToken));
 
-    [HttpGet("sucursal/{sucursalId:guid}")]
-    [ProducesResponseType(typeof(ResultadoPaginado<StockResponse>), StatusCodes.Status200OK)]
+    [HttpGet("branch/{branchId:guid}")]
+    [ProducesResponseType(typeof(PagedResult<StockResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ResultadoPaginado<StockResponse>>> ListarPorSucursal(
-        Guid sucursalId,
-        [FromQuery] StockFiltro filtro,
+    public async Task<ActionResult<PagedResult<StockResponse>>> ListByBranch(
+        Guid branchId,
+        [FromQuery] StockFilter filter,
         CancellationToken cancellationToken) =>
-        Ok(await _stockService.ListarPorSucursalAsync(sucursalId, filtro, cancellationToken));
+        Ok(await _stockService.ListByBranchAsync(branchId, filter, cancellationToken));
 
-    [HttpGet("producto/{productoId:guid}")]
-    [ProducesResponseType(typeof(ResultadoPaginado<StockResponse>), StatusCodes.Status200OK)]
+    [HttpGet("product/{productId:guid}")]
+    [ProducesResponseType(typeof(PagedResult<StockResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<ResultadoPaginado<StockResponse>>> ListarPorProducto(
-        Guid productoId,
-        [FromQuery] StockFiltro filtro,
+    public async Task<ActionResult<PagedResult<StockResponse>>> ListByProduct(
+        Guid productId,
+        [FromQuery] StockFilter filter,
         CancellationToken cancellationToken) =>
-        Ok(await _stockService.ListarPorProductoAsync(productoId, filtro, cancellationToken));
+        Ok(await _stockService.ListByProductAsync(productId, filter, cancellationToken));
 
-    [HttpGet("bajo-minimo")]
-    [ProducesResponseType(typeof(ResultadoPaginado<StockBajoMinimoResponse>), StatusCodes.Status200OK)]
+    [HttpGet("low-stock")]
+    [ProducesResponseType(typeof(PagedResult<LowStockResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ResultadoPaginado<StockBajoMinimoResponse>>> ListarBajoMinimo(
-        [FromQuery] StockBajoMinimoFiltro filtro,
+    public async Task<ActionResult<PagedResult<LowStockResponse>>> ListLowStock(
+        [FromQuery] LowStockFilter filter,
         CancellationToken cancellationToken) =>
-        Ok(await _stockService.ListarBajoMinimoAsync(filtro, cancellationToken));
+        Ok(await _stockService.ListLowStockAsync(filter, cancellationToken));
 
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(StockResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<StockResponse>> ActualizarCantidad(
+    public async Task<ActionResult<StockResponse>> UpdateQuantity(
         Guid id,
-        StockCantidadRequest request,
+        StockQuantityRequest request,
         CancellationToken cancellationToken) =>
-        Ok(await _stockService.ActualizarCantidadAsync(id, request, cancellationToken));
+        Ok(await _stockService.UpdateQuantityAsync(id, request, cancellationToken));
 
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Eliminar(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        await _stockService.EliminarAsync(id, cancellationToken);
+        await _stockService.DeleteAsync(id, cancellationToken);
         return NoContent();
     }
 }

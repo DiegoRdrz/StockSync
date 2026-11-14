@@ -28,7 +28,7 @@ export async function createGateway(options: GatewayOptions): Promise<NestFastif
       path: request.url.split('?')[0],
       status: reply.statusCode,
       durationMs: Math.round(reply.elapsedTime),
-    }, 'Solicitud finalizada');
+    }, 'Request completed');
   });
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule.register(options),
@@ -40,7 +40,7 @@ export async function createGateway(options: GatewayOptions): Promise<NestFastif
     },
   );
   app.useGlobalFilters(new ProblemDetailsFilter());
-  // Como MapReverseProxy en ASP.NET Core: rutas de infraestructura, sin duplicar los controladores del inventario.
+  // Register infrastructure routes without duplicating inventory controllers.
   app.get(InventoryProxyService).registerRoutes(server);
   await app.init();
   return app;

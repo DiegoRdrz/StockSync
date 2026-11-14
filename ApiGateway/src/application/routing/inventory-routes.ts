@@ -1,7 +1,7 @@
-export const inventoryResources = ['productos', 'categorias', 'stock', 'movimientos'] as const;
+export const inventoryResources = ['products', 'categories', 'stock', 'movements'] as const;
 
 export const inventoryRoutes = inventoryResources.map(resource => ({
-  prefix: `/api/inventario/${resource}`,
+  prefix: `/api/inventory/${resource}`,
   rewritePrefix: `/api/${resource}`,
 }));
 

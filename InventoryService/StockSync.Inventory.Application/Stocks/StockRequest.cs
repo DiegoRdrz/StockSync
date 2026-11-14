@@ -1,3 +1,3 @@
 namespace StockSync.Inventory.Application.Stocks;
 
-public sealed record StockRequest(Guid ProductoId, Guid SucursalId, int Cantidad);
+public sealed record StockRequest(Guid ProductId, Guid BranchId, int Quantity);

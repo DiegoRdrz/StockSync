@@ -1,144 +1,124 @@
-# API Gateway de StockSync
+# StockSync API Gateway
 
-Proyecto TypeScript + NestJS con Fastify, dentro del mismo repositorio que `InventoryService`. Separa las políticas del gateway de los adaptadores HTTP y de la composición de dependencias.
+TypeScript + NestJS gateway using Fastify. It publishes the inventory service through one HTTP entry point without duplicating inventory rules or accessing PostgreSQL.
 
 ```text
-Cliente / Swagger → gateway :9090 → InventoryService → PostgreSQL
+Client / Swagger → gateway :9090 → InventoryService → PostgreSQL
 ```
 
-## Arranque completo con Docker
+## Start with Docker
 
-Desde la raíz **StockSync**, con Docker Desktop iniciado:
+From the StockSync repository root:
 
 ```sh
 docker compose up -d --build
 ```
 
-Abre http://localhost:9090/ (redirige a Swagger). Compose ejecuta la API internamente en `http://inventory-api:8080`, aplica sus migraciones y carga los datos demo mediante la configuración que ya traía el repo. La API también conserva su acceso directo de desarrollo en http://localhost:5001.
+Open http://localhost:9090/ to reach Swagger. The internal backend is `http://inventory-api:8080`; its direct development endpoint is http://localhost:5001. The gateway can start before inventory initialization finishes. `/health` checks the gateway process, not the backend or database.
 
-El gateway puede iniciar antes de que termine la inicialización del inventario; espera a que `docker compose logs inventory-api` indique que está escuchando. `/health` comprueba el proceso del gateway, no la base de datos.
+## Run locally
 
-## Gateway local con Node.js
-
-Requiere Node.js 24 o superior (seleccionable con `nvm install && nvm use`). Arranca primero Inventario en Docker o con `dotnet run` siguiendo el README raíz.
+Requires Node.js 24 or later. Start InventoryService first, then:
 
 ```sh
 cd ApiGateway
+nvm install && nvm use  # Optional, when using nvm.
 cp -n .env.example .env
 npm ci
 npm run dev
 ```
 
-`INVENTORY_API_URL=http://localhost:5001` corresponde al inventario en Docker. Si ejecutas .NET directamente, cambia el valor a `http://localhost:5041`. Reinicia `npm run dev` cuando cambies `.env`. Para ejecutar compilado: `npm run build` y `npm start`.
+Use `INVENTORY_API_URL=http://localhost:5001` for inventory in Docker or `http://localhost:5041` for local .NET. Restart after changing `.env`. Use `npm run build` followed by `npm start` for compiled execution. Avoid running the local and Docker gateways on the same port; `docker compose stop api-gateway` stops the container.
 
-No ejecutes al mismo tiempo el gateway local y el de Docker en el mismo puerto. Puedes detener solo el contenedor con `docker compose stop api-gateway` desde la raíz.
+## Routes and behavior
 
-## Rutas públicas
-
-| Ruta | Función |
+| Route | Purpose |
 | --- | --- |
-| `/` | Redirigir a `/swagger` |
-| `/health` | Estado del proceso |
-| `/api/inventario/productos` y subrutas | Productos |
-| `/api/inventario/categorias` y subrutas | Categorías |
-| `/api/inventario/stock` y subrutas | Stocks, entradas, salidas, mínimos e historial |
-| `/api/inventario/movimientos` y subrutas | Listado paginado de movimientos |
-| `/swagger` y subrutas | Swagger UI y `/swagger/v1/swagger.json` |
+| `/` | Redirect to `/swagger` |
+| `/health` | Gateway process status |
+| `/api/inventory/products` and subpaths | Product operations |
+| `/api/inventory/categories` and subpaths | Category operations |
+| `/api/inventory/stock` and subpaths | Assignments, receipts, issues, adjustments and history |
+| `/api/inventory/movements` and subpaths | General movement listing |
+| `/swagger` and subpaths | Swagger UI and OpenAPI JSON |
 
-Las rutas públicas `/api/inventario/...` se reescriben a `/api/...` antes de llamar al servicio. Por ejemplo, `http://localhost:9090/api/inventario/productos` llega a `http://inventory-api:8080/api/productos`. Las rutas antiguas sin `/inventario` ya no están publicadas por el gateway.
-
-Las rutas de inventario reenvían métodos, cuerpo, query y estado HTTP; el backend decide cuáles admite. No se duplican reglas de stock ni se agregan conexiones a la base desde el gateway.
-
-Ejemplos:
+The gateway rewrites `/api/inventory/...` to `/api/...`. For example, `/api/inventory/products` reaches `/api/products` on InventoryService. It preserves methods, request bodies, queries and backend status codes. The backend decides which operations it supports. Legacy Spanish routes are not exposed.
 
 ```sh
-curl http://localhost:9090/api/inventario/productos
-curl http://localhost:9090/api/inventario/categorias
-curl http://localhost:9090/api/inventario/movimientos
-curl http://localhost:9090/api/inventario/stock/sucursal/11111111-1111-1111-1111-111111111111
+curl http://localhost:9090/api/inventory/products
+curl http://localhost:9090/api/inventory/categories
+curl http://localhost:9090/api/inventory/movements
+curl http://localhost:9090/api/inventory/stock/branch/11111111-1111-1111-1111-111111111111
 ```
 
-## Swagger y mismo origen
+## Swagger
 
-El gateway adapta **solo el documento OpenAPI JSON** para publicar las rutas `/api/inventario/...` y `servers: [{"url":"/"}]` y retirar servidores internos definidos en operaciones. Así **Try it out** ejecuta contra el puerto del gateway. Se elimina la cabecera de tenant de la documentación pública porque la establece el gateway. No es necesario `AllowAnyOrigin` para este flujo.
+Only the OpenAPI JSON document is transformed. Paths use `/api/inventory/...` and root `servers` becomes `[{"url":"/"}]`. Internal route/operation servers and the gateway-managed tenant header parameter are removed. Swagger's Try it out therefore targets the gateway origin.
 
-Se conserva el resto de la documentación, con límite de 2 MiB; un documento inválido devuelve 502. Las respuestas de inventario se transmiten por streaming sin transformarlas.
+Other documentation is preserved. Documents are limited to 2 MiB; invalid documents return 502. Inventory responses are streamed without transformation. This same-origin Swagger flow does not require permissive CORS.
 
-## Configuración
+## Configuration
 
-| Variable local | Predeterminado |
+| Variable | Default |
 | --- | --- |
 | `HOST` | `127.0.0.1` |
 | `PORT` | `9090` |
 | `INVENTORY_API_URL` | `http://localhost:5001` |
 | `UPSTREAM_TIMEOUT_MS` | `10000` |
 | `TENANT_ID` | `00000000-0000-0000-0000-000000000001` |
-| `INVENTORY_CA_FILE` | Sin configurar; archivo PEM opcional para un backend HTTPS |
+| `INVENTORY_CA_FILE` | Optional PEM file for an HTTPS backend |
 
-En Docker, configura `GATEWAY_PORT` y `GATEWAY_TENANT_ID` en el `.env` de la raíz, junto a los valores de PostgreSQL existentes. Los cambios en `.env` requieren recrear los contenedores con `docker compose up -d`.
+Docker uses `GATEWAY_PORT` and `GATEWAY_TENANT_ID` from the root `.env`. Recreate containers after configuration changes with `docker compose up -d`.
 
-### Alcance del tenant
+The gateway uses a fixed development tenant and overwrites `X-Tenant-Id`. It does not authenticate users or resolve tenants per user. For production multitenancy, add authentication and authorized tenant resolution and restrict direct backend access.
 
-Esta versión es **de desarrollo con un tenant fijo**. El gateway reemplaza siempre `X-Tenant-Id` por `TENANT_ID`; el consumidor no puede seleccionar otro tenant enviando esa cabecera. El valor predeterminado corresponde a los datos demo del repo.
+### Optional HTTPS
 
-Todavía no hay autenticación de usuarios. Para un despliegue multitenant real hay que autenticar al usuario, resolver su tenant autorizado y proteger el acceso directo al backend. Esta configuración fija no implementa ese flujo.
-
-### HTTPS opcional
-
-Docker y el perfil HTTP de Inventario no requieren certificado. Si eliges el perfil HTTPS (`https://localhost:7079`), Node valida el certificado. Puedes exportar el certificado público local y configurar `INVENTORY_CA_FILE`:
+Docker and the inventory HTTP profile do not need certificates. For `https://localhost:7079`, Node validates TLS. Export the development certificate and configure `INVENTORY_CA_FILE` if needed:
 
 ```sh
 mkdir -p certs
-dotnet dev-certs https --export-path certs/inventario.pem --format PEM
+dotnet dev-certs https --export-path certs/inventory.pem --format PEM
 ```
 
-`certs/` y `.env` están excluidos de Git y del contexto Docker. No se desactiva TLS. Usa Node.js 24 o superior para ejecutar el gateway.
+`certs/` and `.env` are excluded from Git and Docker context. TLS verification remains enabled; Node.js 24 supports the `--use-system-ca` startup option.
 
-## Arquitectura y responsabilidades
+## Structure
 
 ```text
 src/
-  main.ts                       Punto de entrada del proceso
-  composition/                  Arranque Nest/Fastify y registro de dependencias
+  main.ts                       Process entry point
+  composition/                  Nest/Fastify startup and dependency registration
   application/
-    routing/                    Rutas públicas y su correspondencia con Inventario
-    documentation/              Política de publicación de OpenAPI
-    health/                     Estado del proceso
+    routing/                    Public routes and upstream mapping
+    documentation/              OpenAPI publication policy
+    health/                     Process status
   infrastructure/
-    configuration/              Variables de entorno, certificados y opciones inyectadas
-    proxy/                      Transporte, streaming, cabeceras, timeouts y errores upstream
+    configuration/              Environment, certificates and injected options
+    proxy/                      Streaming, headers, timeouts and upstream errors
   presentation/http/
-    controllers/                Endpoints propios: raíz y health
-    filters/                    Traducción de excepciones Nest a Problem Details
+    controllers/                Root and health endpoints
+    filters/                    Nest exceptions as Problem Details
 ```
 
-La dirección de dependencias es `presentation → application` e `infrastructure → application`. `composition` conecta las implementaciones concretas. `application` no importa NestJS, Fastify, variables de entorno ni adaptadores. La adaptación del documento OpenAPI es una función independiente; el adaptador del proxy se encarga de leer el stream, limitar su tamaño y enviar la respuesta HTTP.
+`presentation` and `infrastructure` depend on `application`. `composition` wires concrete implementations. The application layer does not import NestJS, Fastify or environment variables. Inventory entities, repositories and business rules belong to InventoryService, so the gateway has no empty domain layer.
 
-Esta es una aplicación proporcionada de Clean Architecture para un gateway: no se agregan entidades, repositorios ni una capa `domain` vacía. Las reglas de productos, stock y persistencia pertenecen a `InventoryService`. Si aparecen casos de uso que necesiten servicios externos, sus contratos deben definirse en `application` y sus implementaciones en `infrastructure`.
-
-Los endpoints del proxy usan hooks y manejo de errores del plugin Fastify; los guards y filtros de controladores Nest no se aplican automáticamente a esas rutas.
-
-### Compilación y producción
-
-- `npm run build` compila únicamente `src/` a `dist/`, usando `tsconfig.json`.
-- `npm start` ejecuta `dist/main.js`.
-- `npm run typecheck` revisa los tipos del servidor, sin generar archivos.
-- Docker copia únicamente el servidor compilado y sus dependencias de producción.
-
-## Manejo de errores
-
-Conexión fallida: 502. Timeout antes de cabeceras: 504; después de comenzar el cuerpo se interrumpe la conexión. El timeout limita conexión, cabeceras e inactividad del cuerpo, no la duración total de una transmisión continua. No hay reintentos automáticos.
-
-Se genera `X-Request-Id` y se conservan los estados 400/404/409 del inventario. No se registran cuerpos ni Authorization. Las cabeceras de forwarding del cliente se reemplazan.
+Proxy routes use Fastify plugin hooks; Nest controller guards and filters do not automatically apply to them.
 
 ```sh
-npm run typecheck     # Tipado estricto
+npm run typecheck  # Check server types without generating output.
+npm run build     # Compile src/ into dist/.
+npm start         # Run dist/main.js.
 ```
 
-Referencias: [NestJS providers](https://docs.nestjs.com/providers) y [@fastify/http-proxy](https://github.com/fastify/fastify-http-proxy).
+Docker includes compiled server code and production dependencies. There are no test or auxiliary script folders.
 
-## Diagnóstico del error 500 de PostgreSQL
+## Errors and request handling
 
-Si Inventario registra `28P01: password authentication failed`, ajusta `POSTGRES_PASSWORD` en el `.env` raíz a la contraseña **actual** del volumen y ejecuta `docker compose up -d --no-build inventory-api`. Cambiar la variable no cambia la contraseña de una base ya inicializada. No es necesario borrar el volumen.
+Connection failures return 502. Timeouts before headers return 504; timeouts after the response starts interrupt the connection. The timeout limits connection establishment, headers and body inactivity rather than total continuous-stream duration. Requests are not automatically retried.
 
-La credencial de este equipo se recuperó del historial y se guardó únicamente en `.env`, excluido de Git. El servicio C# y el gateway no incluyen esa credencial en las respuestas.
+The gateway generates `X-Request-Id`, replaces client forwarding headers, and preserves backend errors such as 400, 404 and 409. Logs exclude bodies and authorization headers.
+
+If PostgreSQL reports `28P01: password authentication failed`, set the root `POSTGRES_PASSWORD` to the existing volume's password and recreate inventory with `docker compose up -d --no-build inventory-api`. Changing an environment variable does not change an already-initialized database password.
+
+References: [NestJS providers](https://docs.nestjs.com/providers) and [Fastify HTTP proxy](https://github.com/fastify/fastify-http-proxy).

@@ -18,7 +18,7 @@ export class InventoryProxyService {
         upstream: target.origin,
         prefix,
         rewritePrefix,
-        // El plugin transfiere los cuerpos por streaming y administra las conexiones.
+        // The plugin streams bodies and manages connections.
         proxyPayloads: true,
         undici: {
           connectTimeout: timeoutMs, headersTimeout: timeoutMs, bodyTimeout: timeoutMs,
@@ -77,7 +77,7 @@ function upstreamProblem(error: Error & { statusCode?: number; cause?: unknown }
   return {
     status: timeout ? 504 : 502,
     title: timeout
-      ? 'El servicio de inventario excedió el tiempo de espera'
-      : 'No fue posible conectar con el servicio de inventario',
+      ? 'The inventory service timed out'
+      : 'Unable to connect to the inventory service',
   };
 }

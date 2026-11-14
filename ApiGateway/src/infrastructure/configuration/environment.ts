@@ -16,7 +16,7 @@ function readUpstream(value: string): URL {
   const hasCredentials = Boolean(url.username || url.password);
   const hasPathOrQuery = url.pathname !== '/' || Boolean(url.search || url.hash);
   if (!isHttp || hasCredentials || hasPathOrQuery) {
-    throw new Error('INVENTORY_API_URL debe ser un origen HTTP(S), sin credenciales, ruta ni query.');
+    throw new Error('INVENTORY_API_URL must be an HTTP(S) origin without credentials, path or query.');
   }
   return url;
 }
@@ -24,7 +24,7 @@ function readUpstream(value: string): URL {
 function readPositiveInteger(value: string, name: string, maximum: number): number {
   const number = Number(value);
   if (!Number.isInteger(number) || number < 1 || number > maximum) {
-    throw new Error(`${name} debe estar entre 1 y ${maximum}.`);
+    throw new Error(`${name} must be between 1 and ${maximum}.`);
   }
   return number;
 }
@@ -33,7 +33,7 @@ function readTenantId(value: string): string {
   const isGuid = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
   const isEmpty = value === '00000000-0000-0000-0000-000000000000';
   if (!isGuid || isEmpty) {
-    throw new Error('TENANT_ID debe ser un GUID válido y distinto de vacío.');
+    throw new Error('TENANT_ID must be a valid, non-empty GUID.');
   }
   return value;
 }

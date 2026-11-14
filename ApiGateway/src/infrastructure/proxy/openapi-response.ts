@@ -2,7 +2,7 @@ import { publishInventoryOpenApi } from '../../application/documentation/publish
 import type { FastifyReply, RouteGenericInterface, RawServerBase } from 'fastify';
 import type { Readable } from 'node:stream';
 
-// El documento público debe apuntar al origen público, nunca al host interno.
+// The public document must use the public origin, never the internal host.
 export async function sendGatewayOpenApi(reply: FastifyReply<RouteGenericInterface, RawServerBase>, stream: Readable): Promise<void> {
   try {
     const input = await readOpenApi(stream);
@@ -15,7 +15,7 @@ export async function sendGatewayOpenApi(reply: FastifyReply<RouteGenericInterfa
     stream.destroy();
     reply.removeHeader('content-length');
     reply.code(502).type('application/problem+json').send({ type: 'about:blank', status: 502,
-      title: 'No fue posible procesar la documentación de Inventario', requestId: reply.request.id });
+      title: 'Unable to process the Inventory documentation', requestId: reply.request.id });
   }
 }
 
@@ -26,7 +26,7 @@ async function readOpenApi(stream: Readable): Promise<unknown> {
   for await (const chunk of stream) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     bytes += buffer.length;
-    if (bytes > maxBytes) throw new Error('OpenAPI supera 2 MiB');
+    if (bytes > maxBytes) throw new Error('OpenAPI exceeds 2 MiB');
     chunks.push(buffer);
   }
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));

@@ -8,8 +8,8 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     const request = context.getRequest<FastifyRequest>();
     const reply = context.getResponse<FastifyReply>();
     const status = exception instanceof HttpException ? exception.getStatus() : 500;
-    const title = status === 404 ? 'Ruta no disponible en el gateway'
-      : status === 500 ? 'Error interno del gateway' : 'Solicitud inválida';
+    const title = status === 404 ? 'Route not available in the gateway'
+      : status === 500 ? 'Internal gateway error' : 'Invalid request';
     reply.code(status).type('application/problem+json').send({
       type: 'about:blank', status, title, requestId: request.id,
     });

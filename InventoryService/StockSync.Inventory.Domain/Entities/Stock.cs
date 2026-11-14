@@ -2,72 +2,72 @@ using StockSync.Inventory.Domain.Exceptions;
 
 namespace StockSync.Inventory.Domain.Entities;
 
-// Cantidad de un producto en una sucursal. SucursalId es solo el identificador de una sucursal
-// que pertenece a otro servicio: Inventory no la modela ni la valida contra ningún otro contexto.
+// Product quantity at a branch. BranchId identifies a branch owned by another service;
+// Inventory neither models the branch nor validates it against another context.
 public class Stock
 {
     public Guid Id { get; private set; }
-    public Guid ProductoId { get; private set; }
-    public Guid SucursalId { get; private set; }
-    public int Cantidad { get; private set; }
+    public Guid ProductId { get; private set; }
+    public Guid BranchId { get; private set; }
+    public int Quantity { get; private set; }
 
     private Stock()
     {
     }
 
-    public static Stock Crear(Guid productoId, Guid sucursalId, int cantidad)
+    public static Stock Create(Guid productId, Guid branchId, int quantity)
     {
-        if (productoId == Guid.Empty)
-            throw new DomainException("El producto indicado no es válido.");
-        if (sucursalId == Guid.Empty)
-            throw new DomainException("La sucursal indicada no es válida.");
-        AsegurarCantidadValida(cantidad);
+        if (productId == Guid.Empty)
+            throw new DomainException("The specified product is invalid.");
+        if (branchId == Guid.Empty)
+            throw new DomainException("The specified branch is invalid.");
+        EnsureValidQuantity(quantity);
 
         return new Stock
         {
             Id = Guid.NewGuid(),
-            ProductoId = productoId,
-            SucursalId = sucursalId,
-            Cantidad = cantidad
+            ProductId = productId,
+            BranchId = branchId,
+            Quantity = quantity
         };
     }
 
-    // Todo cambio de saldo deja un movimiento para que el historial explique siempre el saldo actual.
-    // Devuelve null si la cantidad no cambia, porque un movimiento siempre tiene cantidad positiva.
-    public MovimientoStock? ActualizarCantidad(int nuevaCantidad)
+    // Every balance change records a movement to explain the current balance.
+    // Return null when the quantity is unchanged; movements always have positive quantities.
+    public StockMovement? UpdateQuantity(int newQuantity)
     {
-        AsegurarCantidadValida(nuevaCantidad);
-        if (nuevaCantidad == Cantidad)
+        EnsureValidQuantity(newQuantity);
+        if (newQuantity == Quantity)
             return null;
 
-        var cantidadAnterior = Cantidad;
-        Cantidad = nuevaCantidad;
-        return new MovimientoStock(this, TipoMovimientoStock.Ajuste, Math.Abs(nuevaCantidad - cantidadAnterior), cantidadAnterior);
+        var previousQuantity = Quantity;
+        Quantity = newQuantity;
+        return new StockMovement(this, StockMovementType.Adjustment, Math.Abs(newQuantity - previousQuantity), previousQuantity);
     }
 
-    public MovimientoStock RegistrarMovimiento(TipoMovimientoStock tipo, int cantidad)
+    public StockMovement RecordMovement(StockMovementType type, int quantity)
     {
-        if (cantidad <= 0)
-            throw new DomainException("La cantidad del movimiento debe ser mayor que cero.");
+        if (quantity <= 0)
+            throw new DomainException("Movement quantity must be greater than zero.");
 
-        if (tipo is not (TipoMovimientoStock.Entrada or TipoMovimientoStock.Salida))
-            throw new DomainException("El tipo de movimiento no es válido.");
+        if (type is not (StockMovementType.Receipt or StockMovementType.Issue))
+            throw new DomainException("The movement type is invalid.");
 
-        if (tipo == TipoMovimientoStock.Salida && cantidad > Cantidad)
-            throw new StockInsuficienteException(Cantidad, cantidad);
+        if (type == StockMovementType.Issue && quantity > Quantity)
+            throw new InsufficientStockException(Quantity, quantity);
 
-        if (tipo == TipoMovimientoStock.Entrada && cantidad > int.MaxValue - Cantidad)
-            throw new DomainException("La entrada supera la cantidad máxima permitida.");
+        if (type == StockMovementType.Receipt && quantity > int.MaxValue - Quantity)
+            throw new DomainException("The receipt exceeds the maximum allowed quantity.");
 
-        var cantidadAnterior = Cantidad;
-        Cantidad = tipo == TipoMovimientoStock.Entrada ? Cantidad + cantidad : Cantidad - cantidad;
+        var previousQuantity = Quantity;
+        Quantity = type == StockMovementType.Receipt ? Quantity + quantity : Quantity - quantity;
 
-        return new MovimientoStock(this, tipo, cantidad, cantidadAnterior);
+        return new StockMovement(this, type, quantity, previousQuantity);
     }
 
-    private static void AsegurarCantidadValida(int cantidad)
+    private static void EnsureValidQuantity(int quantity)
     {
-        if (cantidad < 0)
-            throw new DomainException("La cantidad no puede ser negativa.");
+        if (quantity < 0)
+            throw new DomainException("Quantity cannot be negative.");
     }
 }

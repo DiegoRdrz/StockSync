@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using StockSync.Inventory.Application.Common.Exceptions;
-using StockSync.Inventory.Application.Movimientos;
-using StockSync.Inventory.Application.Productos;
+using StockSync.Inventory.Application.Movements;
+using StockSync.Inventory.Application.Products;
 using StockSync.Inventory.Application.Stocks;
 using StockSync.Inventory.Domain.Entities;
 using StockSync.Inventory.Domain.Exceptions;
@@ -12,142 +12,142 @@ namespace StockSync.Inventory.IntegrationTests;
 
 public class StockPostgresTests : PostgresTestBase
 {
-    private static StockService CrearStockService(InventoryDbContext context) =>
-        new(new StockRepository(context), new ProductoRepository(context), new MovimientoStockRepository(context),
-            new UnidadDeTrabajo(context));
+    private static StockService CreateStockService(InventoryDbContext context) =>
+        new(new StockRepository(context), new ProductRepository(context), new StockMovementRepository(context),
+            new UnitOfWork(context));
 
-    private static MovimientoStockService CrearMovimientoService(InventoryDbContext context) =>
-        new(new StockRepository(context), new ProductoRepository(context), new MovimientoStockRepository(context),
-            new UnidadDeTrabajo(context));
+    private static StockMovementService CreateMovementService(InventoryDbContext context) =>
+        new(new StockRepository(context), new ProductRepository(context), new StockMovementRepository(context),
+            new UnitOfWork(context));
 
-    private async Task<Producto> CrearProductoAsync(string sku = "FER-001", int stockMinimo = 0)
+    private async Task<Product> CreateProductAsync(string sku = "FER-001", int minimumStock = 0)
     {
-        await using var context = CrearContexto();
-        var producto = Producto.Crear($"Producto {sku}", sku, null, 1m, 2m, stockMinimo, null);
-        context.Productos.Add(producto);
+        await using var context = CreateContext();
+        var product = Product.Create($"Product {sku}", sku, null, 1m, 2m, minimumStock, null);
+        context.Products.Add(product);
         await context.SaveChangesAsync();
-        return producto;
+        return product;
     }
 
     [PostgreSqlFact]
-    public async Task SaldoInicialYAjustes_QuedanEnElHistorialYCuadranConElSaldo()
+    public async Task InitialBalanceAndAdjustments_AreRecordedAndMatchBalance()
     {
-        var producto = await CrearProductoAsync();
-        await using var context = CrearContexto();
-        var stockService = CrearStockService(context);
+        var product = await CreateProductAsync();
+        await using var context = CreateContext();
+        var stockService = CreateStockService(context);
 
-        var stock = await stockService.CrearAsync(new(producto.Id, Guid.NewGuid(), 10), default);
-        await CrearMovimientoService(context).RegistrarSalidaAsync(stock.Id, new(3), default);
-        await stockService.ActualizarCantidadAsync(stock.Id, new(20), default);
-        await stockService.ActualizarCantidadAsync(stock.Id, new(20), default);
+        var stock = await stockService.CreateAsync(new(product.Id, Guid.NewGuid(), 10), default);
+        await CreateMovementService(context).RecordIssueAsync(stock.Id, new(3), default);
+        await stockService.UpdateQuantityAsync(stock.Id, new(20), default);
+        await stockService.UpdateQuantityAsync(stock.Id, new(20), default);
 
-        await using var verificacion = CrearContexto();
-        var movimientos = await verificacion.MovimientosStock
-            .Where(m => m.StockId == stock.Id).OrderBy(m => m.Fecha).ToListAsync();
-        var saldo = (await verificacion.Stocks.SingleAsync(s => s.Id == stock.Id)).Cantidad;
+        await using var verification = CreateContext();
+        var movements = await verification.StockMovements
+            .Where(m => m.StockId == stock.Id).OrderBy(m => m.Date).ToListAsync();
+        var balance = (await verification.Stocks.SingleAsync(s => s.Id == stock.Id)).Quantity;
         Assert.Equal(
-            new[] { TipoMovimientoStock.Ajuste, TipoMovimientoStock.Salida, TipoMovimientoStock.Ajuste },
-            movimientos.Select(m => m.Tipo));
-        Assert.Equal(20, saldo);
-        Assert.Equal(saldo, movimientos.Sum(m => m.CantidadPosterior - m.CantidadAnterior));
+            new[] { StockMovementType.Adjustment, StockMovementType.Issue, StockMovementType.Adjustment },
+            movements.Select(m => m.Type));
+        Assert.Equal(20, balance);
+        Assert.Equal(balance, movements.Sum(m => m.NewQuantity - m.PreviousQuantity));
     }
 
-    // Con bloqueo optimista solo, la mayoría recibía 409 por concurrencia aunque hubiera stock disponible.
+    // Optimistic locking alone rejected requests even when sufficient stock remained.
     [PostgreSqlFact]
-    public async Task VentasSimultaneas_SeAplicanEnOrdenSinSobreventaNiConflictos()
+    public async Task ConcurrentSales_ApplySequentiallyWithoutOversellingOrConflicts()
     {
-        var producto = await CrearProductoAsync();
+        var product = await CreateProductAsync();
         Guid stockId;
-        await using (var context = CrearContexto())
-            stockId = (await CrearStockService(context).CrearAsync(new(producto.Id, Guid.NewGuid(), 10), default)).Id;
+        await using (var context = CreateContext())
+            stockId = (await CreateStockService(context).CreateAsync(new(product.Id, Guid.NewGuid(), 10), default)).Id;
 
-        var resultados = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(async () =>
+        var results = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(async () =>
         {
-            await using var context = CrearContexto();
+            await using var context = CreateContext();
             try
             {
-                await CrearMovimientoService(context).RegistrarSalidaAsync(stockId, new(1), default);
+                await CreateMovementService(context).RecordIssueAsync(stockId, new(1), default);
                 return true;
             }
-            catch (StockInsuficienteException)
+            catch (InsufficientStockException)
             {
                 return false;
             }
         })));
 
-        Assert.Equal(10, resultados.Count(vendida => vendida));
-        await using var verificacion = CrearContexto();
-        Assert.Equal(0, (await verificacion.Stocks.SingleAsync()).Cantidad);
-        var salidas = await verificacion.MovimientosStock
-            .Where(m => m.Tipo == TipoMovimientoStock.Salida).OrderBy(m => m.CantidadAnterior).ToListAsync();
-        Assert.Equal(Enumerable.Range(1, 10), salidas.Select(m => m.CantidadAnterior));
+        Assert.Equal(10, results.Count(sold => sold));
+        await using var verification = CreateContext();
+        Assert.Equal(0, (await verification.Stocks.SingleAsync()).Quantity);
+        var issues = await verification.StockMovements
+            .Where(m => m.Type == StockMovementType.Issue).OrderBy(m => m.PreviousQuantity).ToListAsync();
+        Assert.Equal(Enumerable.Range(1, 10), issues.Select(m => m.PreviousQuantity));
     }
 
     [PostgreSqlFact]
-    public async Task ListadoPorSucursal_ExcluyeProductosDadosDeBajaYPagina()
+    public async Task ListByBranch_ExcludesInactiveProductsAndPaginates()
     {
-        var sucursal = Guid.NewGuid();
-        var activos = new[] { await CrearProductoAsync("A-1"), await CrearProductoAsync("A-2") };
-        var baja = await CrearProductoAsync("B-1");
-        await using var context = CrearContexto();
-        var stockService = CrearStockService(context);
-        foreach (var producto in activos.Append(baja))
-            await stockService.CrearAsync(new(producto.Id, sucursal, 0), default);
-        await new ProductoService(new ProductoRepository(context), new CategoriaRepository(context))
-            .EliminarAsync(baja.Id, default);
+        var branch = Guid.NewGuid();
+        var activeItems = new[] { await CreateProductAsync("A-1"), await CreateProductAsync("A-2") };
+        var inactive = await CreateProductAsync("B-1");
+        await using var context = CreateContext();
+        var stockService = CreateStockService(context);
+        foreach (var product in activeItems.Append(inactive))
+            await stockService.CreateAsync(new(product.Id, branch, 0), default);
+        await new ProductService(new ProductRepository(context), new CategoryRepository(context))
+            .DeleteAsync(inactive.Id, default);
 
-        var pagina1 = await stockService.ListarPorSucursalAsync(sucursal, new StockFiltro { TamanoPagina = 1 }, default);
-        var pagina2 = await stockService.ListarPorSucursalAsync(sucursal, new StockFiltro { Pagina = 2, TamanoPagina = 1 }, default);
+        var page1 = await stockService.ListByBranchAsync(branch, new StockFilter { PageSize = 1 }, default);
+        var page2 = await stockService.ListByBranchAsync(branch, new StockFilter { Page = 2, PageSize = 1 }, default);
 
-        Assert.Equal(2, pagina1.Total);
-        Assert.Equal(activos.Select(p => p.Id),
-            pagina1.Items.Concat(pagina2.Items).Select(s => s.ProductoId));
+        Assert.Equal(2, page1.Total);
+        Assert.Equal(activeItems.Select(p => p.Id),
+            page1.Items.Concat(page2.Items).Select(s => s.ProductId));
         await Assert.ThrowsAsync<NotFoundException>(
-            () => stockService.ListarPorProductoAsync(baja.Id, new StockFiltro(), default));
+            () => stockService.ListByProductAsync(inactive.Id, new StockFilter(), default));
     }
 
     [PostgreSqlFact]
-    public async Task BajoMinimo_ListaSoloCantidadesMenoresAlMinimoOrdenadasPorFaltante()
+    public async Task LowStock_ListsOnlyBelowMinimumQuantitiesOrderedByShortage()
     {
-        var sucursal = Guid.NewGuid();
-        var otraSucursal = Guid.NewGuid();
-        var minimoCinco = await CrearProductoAsync("MIN-5", stockMinimo: 5);
-        var minimoDiez = await CrearProductoAsync("MIN-10", stockMinimo: 10);
-        var sinMinimo = await CrearProductoAsync("MIN-0", stockMinimo: 0);
-        await using var context = CrearContexto();
-        var stockService = CrearStockService(context);
-        var alertaLeve = await stockService.CrearAsync(new(minimoCinco.Id, sucursal, 3), default);
-        await stockService.CrearAsync(new(minimoCinco.Id, otraSucursal, 5), default);
-        var alertaGrave = await stockService.CrearAsync(new(minimoDiez.Id, otraSucursal, 1), default);
-        await stockService.CrearAsync(new(sinMinimo.Id, sucursal, 0), default);
+        var branch = Guid.NewGuid();
+        var otherBranch = Guid.NewGuid();
+        var minimumFive = await CreateProductAsync("MIN-5", minimumStock: 5);
+        var minimumTen = await CreateProductAsync("MIN-10", minimumStock: 10);
+        var withoutMinimum = await CreateProductAsync("MIN-0", minimumStock: 0);
+        await using var context = CreateContext();
+        var stockService = CreateStockService(context);
+        var minorAlert = await stockService.CreateAsync(new(minimumFive.Id, branch, 3), default);
+        await stockService.CreateAsync(new(minimumFive.Id, otherBranch, 5), default);
+        var criticalAlert = await stockService.CreateAsync(new(minimumTen.Id, otherBranch, 1), default);
+        await stockService.CreateAsync(new(withoutMinimum.Id, branch, 0), default);
 
-        var todas = await stockService.ListarBajoMinimoAsync(new StockBajoMinimoFiltro(), default);
-        var deSucursal = await stockService.ListarBajoMinimoAsync(new StockBajoMinimoFiltro { SucursalId = sucursal }, default);
+        var allItems = await stockService.ListLowStockAsync(new LowStockFilter(), default);
+        var byBranch = await stockService.ListLowStockAsync(new LowStockFilter { BranchId = branch }, default);
 
-        Assert.Equal(new[] { alertaGrave.Id, alertaLeve.Id }, todas.Items.Select(a => a.StockId));
-        Assert.Equal(new[] { 9, 2 }, todas.Items.Select(a => a.Faltante));
-        Assert.Equal("MIN-10", todas.Items[0].ProductoSku);
-        Assert.Equal(alertaLeve.Id, Assert.Single(deSucursal.Items).StockId);
+        Assert.Equal(new[] { criticalAlert.Id, minorAlert.Id }, allItems.Items.Select(a => a.StockId));
+        Assert.Equal(new[] { 9, 2 }, allItems.Items.Select(a => a.Shortage));
+        Assert.Equal("MIN-10", allItems.Items[0].ProductSku);
+        Assert.Equal(minorAlert.Id, Assert.Single(byBranch.Items).StockId);
     }
 
     [PostgreSqlFact]
-    public async Task EliminarProductoYStock_SoloSinExistencias()
+    public async Task DeleteProductAndStock_OnlyWithoutStock()
     {
-        var producto = await CrearProductoAsync();
-        await using var context = CrearContexto();
-        var productoService = new ProductoService(new ProductoRepository(context), new CategoriaRepository(context));
-        var stockService = CrearStockService(context);
-        var conExistencias = await stockService.CrearAsync(new(producto.Id, Guid.NewGuid(), 5), default);
-        var sinExistencias = await stockService.CrearAsync(new(producto.Id, Guid.NewGuid(), 0), default);
+        var product = await CreateProductAsync();
+        await using var context = CreateContext();
+        var productService = new ProductService(new ProductRepository(context), new CategoryRepository(context));
+        var stockService = CreateStockService(context);
+        var withStock = await stockService.CreateAsync(new(product.Id, Guid.NewGuid(), 5), default);
+        var withoutStock = await stockService.CreateAsync(new(product.Id, Guid.NewGuid(), 0), default);
 
-        await Assert.ThrowsAsync<ConflictException>(() => productoService.EliminarAsync(producto.Id, default));
-        await Assert.ThrowsAsync<ConflictException>(() => stockService.EliminarAsync(conExistencias.Id, default));
-        await stockService.EliminarAsync(sinExistencias.Id, default);
-        await CrearMovimientoService(context).RegistrarSalidaAsync(conExistencias.Id, new(5), default);
-        await productoService.EliminarAsync(producto.Id, default);
+        await Assert.ThrowsAsync<ConflictException>(() => productService.DeleteAsync(product.Id, default));
+        await Assert.ThrowsAsync<ConflictException>(() => stockService.DeleteAsync(withStock.Id, default));
+        await stockService.DeleteAsync(withoutStock.Id, default);
+        await CreateMovementService(context).RecordIssueAsync(withStock.Id, new(5), default);
+        await productService.DeleteAsync(product.Id, default);
 
-        await using var verificacion = CrearContexto();
-        Assert.False((await verificacion.Productos.SingleAsync()).Activo);
-        Assert.Equal(conExistencias.Id, (await verificacion.Stocks.SingleAsync()).Id);
+        await using var verification = CreateContext();
+        Assert.False((await verification.Products.SingleAsync()).IsActive);
+        Assert.Equal(withStock.Id, (await verification.Stocks.SingleAsync()).Id);
     }
 }

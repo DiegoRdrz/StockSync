@@ -24,8 +24,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=inventory-db;Database=stocksync_inventory;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
-      - Inicializacion__AplicarMigraciones=true
-      - Inicializacion__CargarDatosDemo=${CARGAR_DATOS_DEMO:-true}
+      - Initialization__ApplyMigrations=true
+      - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-true}
     depends_on:
       inventory-db:
         condition: service_healthy
@@ -56,13 +56,33 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=identity-db;Database=stocksync_identity;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
       - Initialization__ApplyMigrations=true
-      - Initialization__LoadDemoData=${CARGAR_DATOS_DEMO:-true}
+      - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-true}
       - Jwt__Issuer=StockSync.Identity
       - Jwt__Audience=StockSync.Ecosystem
       - Jwt__SecretKey=${JWT_SECRET_KEY:-StockSyncSuperSecretSecureKey123456789!NeverShareInProduction!}
     depends_on:
       identity-db:
         condition: service_healthy
+
+  api-gateway:
+    build:
+      context: ./ApiGateway
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-9090}:9090"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 9090
+      INVENTORY_API_URL: http://inventory-api:8080
+      TENANT_ID: ${GATEWAY_TENANT_ID:-00000000-0000-0000-0000-000000000001}
+      UPSTREAM_TIMEOUT_MS: 10000
+    depends_on:
+      inventory-api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9090/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   inventory_data:

@@ -19,7 +19,7 @@ RUN dotnet publish "StockSync.Inventory.WebApi.csproj" -c Release -o /app/publis
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-# Al arrancar, la API aplica las migraciones pendientes para que la base quede completa.
-# Para gestionarlas aparte (por ejemplo, con varias réplicas), definir Inicializacion__AplicarMigraciones=false.
-ENV Inicializacion__AplicarMigraciones=true
+# Apply pending migrations before serving requests.
+# Set Initialization__ApplyMigrations=false to manage migrations separately.
+ENV Initialization__ApplyMigrations=true
 ENTRYPOINT ["dotnet", "StockSync.Inventory.WebApi.dll"]

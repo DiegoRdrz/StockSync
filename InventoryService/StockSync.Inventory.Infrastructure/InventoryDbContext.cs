@@ -6,60 +6,60 @@ namespace StockSync.Inventory.Infrastructure;
 
 public class InventoryDbContext : DbContext
 {
-    // Propiedad sombra: la multitenencia es un asunto de persistencia y el dominio no la conoce.
-    public const string TenantIdPropiedad = "TenantId";
+    // Shadow property: multitenancy belongs to persistence, not the domain.
+    public const string TenantIdProperty = "TenantId";
 
-    private readonly ITenantActual? _tenantActual;
+    private readonly ICurrentTenant? _currentTenant;
 
     public InventoryDbContext(DbContextOptions<InventoryDbContext> options) : base(options)
     {
     }
 
-    public InventoryDbContext(DbContextOptions<InventoryDbContext> options, ITenantActual tenantActual) : base(options)
+    public InventoryDbContext(DbContextOptions<InventoryDbContext> options, ICurrentTenant currentTenant) : base(options)
     {
-        _tenantActual = tenantActual;
+        _currentTenant = currentTenant;
     }
 
-    // Se evalúa en cada consulta, así que los filtros globales usan el tenant de la solicitud en curso.
-    public Guid TenantId => _tenantActual?.TenantId ?? TenantPorDefecto.Id;
+    // Evaluate per query so global filters use the current request tenant.
+    public Guid TenantId => _currentTenant?.TenantId ?? DefaultTenant.Id;
 
-    public DbSet<Producto> Productos => Set<Producto>();
-    public DbSet<Categoria> Categorias => Set<Categoria>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<Category> Categories => Set<Category>();
     public DbSet<Stock> Stocks => Set<Stock>();
-    public DbSet<MovimientoStock> MovimientosStock => Set<MovimientoStock>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(InventoryDbContext).Assembly);
 
-        FiltrarPorTenant<Categoria>(modelBuilder);
-        FiltrarPorTenant<Producto>(modelBuilder);
-        FiltrarPorTenant<Stock>(modelBuilder);
-        FiltrarPorTenant<MovimientoStock>(modelBuilder);
+        FilterByTenant<Category>(modelBuilder);
+        FilterByTenant<Product>(modelBuilder);
+        FilterByTenant<Stock>(modelBuilder);
+        FilterByTenant<StockMovement>(modelBuilder);
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        AsignarTenantANuevos();
+        AssignTenantToNewEntities();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
-        AsignarTenantANuevos();
+        AssignTenantToNewEntities();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
-    private void FiltrarPorTenant<TEntidad>(ModelBuilder modelBuilder) where TEntidad : class =>
-        modelBuilder.Entity<TEntidad>().HasQueryFilter(e => EF.Property<Guid>(e, TenantIdPropiedad) == TenantId);
+    private void FilterByTenant<TEntity>(ModelBuilder modelBuilder) where TEntity : class =>
+        modelBuilder.Entity<TEntity>().HasQueryFilter(e => EF.Property<Guid>(e, TenantIdProperty) == TenantId);
 
-    private void AsignarTenantANuevos()
+    private void AssignTenantToNewEntities()
     {
-        foreach (var entrada in ChangeTracker.Entries().Where(e => e.State == EntityState.Added))
+        foreach (var entry in ChangeTracker.Entries().Where(e => e.State == EntityState.Added))
         {
-            if (entrada.Metadata.FindProperty(TenantIdPropiedad) is not null)
-                entrada.Property(TenantIdPropiedad).CurrentValue = TenantId;
+            if (entry.Metadata.FindProperty(TenantIdProperty) is not null)
+                entry.Property(TenantIdProperty).CurrentValue = TenantId;
         }
     }
 }

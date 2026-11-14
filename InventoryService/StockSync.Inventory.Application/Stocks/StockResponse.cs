@@ -4,13 +4,13 @@ namespace StockSync.Inventory.Application.Stocks;
 
 public sealed record StockResponse(
     Guid Id,
-    Guid ProductoId,
-    Guid SucursalId,
-    int Cantidad)
+    Guid ProductId,
+    Guid BranchId,
+    int Quantity)
 {
-    public static StockResponse Desde(Stock stock) => new(
+    public static StockResponse From(Stock stock) => new(
         stock.Id,
-        stock.ProductoId,
-        stock.SucursalId,
-        stock.Cantidad);
+        stock.ProductId,
+        stock.BranchId,
+        stock.Quantity);
 }

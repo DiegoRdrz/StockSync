@@ -25,18 +25,18 @@ public class ApiExceptionHandler : IExceptionHandler
                 Status = StatusCodes.Status400BadRequest,
                 Title = ex.Message
             },
-            StockInsuficienteException ex => Crear(StatusCodes.Status409Conflict, "Stock insuficiente.", ex.Message),
-            DomainException ex => Crear(StatusCodes.Status400BadRequest, "Regla de negocio no válida.", ex.Message),
-            NotFoundException ex => Crear(StatusCodes.Status404NotFound, "Recurso no encontrado.", ex.Message),
-            ConflictException ex => Crear(StatusCodes.Status409Conflict, "Conflicto con el estado actual.", ex.Message),
+            InsufficientStockException ex => Create(StatusCodes.Status409Conflict, "Insufficient stock.", ex.Message),
+            DomainException ex => Create(StatusCodes.Status400BadRequest, "Invalid business rule.", ex.Message),
+            NotFoundException ex => Create(StatusCodes.Status404NotFound, "Resource not found.", ex.Message),
+            ConflictException ex => Create(StatusCodes.Status409Conflict, "Conflict with the current state.", ex.Message),
             _ => null
         };
 
-        // El log del ExceptionHandlerMiddleware está silenciado en appsettings porque en .NET 8
-        // registra como error también las excepciones de negocio; aquí solo se registran las inesperadas.
+        // ExceptionHandlerMiddleware logging is disabled in appsettings because .NET 8
+        // also logs business exceptions as errors; only unexpected exceptions are logged here.
         if (problemDetails is null)
         {
-            _logger.LogError(exception, "Excepción no controlada en {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
+            _logger.LogError(exception, "Unhandled exception at {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
             return false;
         }
 
@@ -49,6 +49,6 @@ public class ApiExceptionHandler : IExceptionHandler
         });
     }
 
-    private static ProblemDetails Crear(int status, string title, string detail) =>
+    private static ProblemDetails Create(int status, string title, string detail) =>
         new() { Status = status, Title = title, Detail = detail };
 }

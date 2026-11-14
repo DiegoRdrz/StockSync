@@ -5,7 +5,7 @@ using StockSync.Inventory.Infrastructure;
 
 namespace StockSync.Inventory.IntegrationTests;
 
-// Cada prueba crea y elimina su propia base de datos; nunca modifica la base de la aplicación.
+// Each test creates and deletes its own database, never the application's database.
 public abstract class PostgresTestBase : IAsyncLifetime
 {
     private readonly string _database = $"stocksync_test_{Guid.NewGuid():N}";
@@ -20,7 +20,7 @@ public abstract class PostgresTestBase : IAsyncLifetime
         await command.ExecuteNonQueryAsync();
         _connectionString = new NpgsqlConnectionStringBuilder(adminConnection) { Database = _database, Pooling = false }.ConnectionString;
 
-        await using var context = CrearContexto();
+        await using var context = CreateContext();
         await context.Database.MigrateAsync();
     }
 
@@ -32,12 +32,12 @@ public abstract class PostgresTestBase : IAsyncLifetime
         await command.ExecuteNonQueryAsync();
     }
 
-    protected InventoryDbContext CrearContexto() => new(Opciones());
+    protected InventoryDbContext CreateContext() => new(Options());
 
-    protected InventoryDbContext CrearContexto(Guid tenantId) => new(Opciones(), new TenantFijo(tenantId));
+    protected InventoryDbContext CreateContext(Guid tenantId) => new(Options(), new FixedTenant(tenantId));
 
-    private DbContextOptions<InventoryDbContext> Opciones() =>
+    private DbContextOptions<InventoryDbContext> Options() =>
         new DbContextOptionsBuilder<InventoryDbContext>().UseNpgsql(_connectionString).Options;
 
-    private sealed record TenantFijo(Guid TenantId) : ITenantActual;
+    private sealed record FixedTenant(Guid TenantId) : ICurrentTenant;
 }

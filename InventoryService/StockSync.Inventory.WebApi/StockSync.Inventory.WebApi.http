@@ -1,142 +1,142 @@
 @StockSync.Inventory.WebApi_HostAddress = http://localhost:5041
 
-### Últimos 10 movimientos (en Docker cambiar el puerto de arriba a 5001)
-GET {{StockSync.Inventory.WebApi_HostAddress}}/api/movimientos
+### Latest 10 movements (use port 5001 for Docker)
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/movements
 
-### Siguiente página de 10 movimientos
-GET {{StockSync.Inventory.WebApi_HostAddress}}/api/movimientos/pagina/2
+### Next page of 10 movements
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/movements/page/2
 
-### 1. Crear una Categoría
-POST {{StockSync.Inventory.WebApi_HostAddress}}/api/categorias
+### 1. Create a category
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/categories
 Content-Type: application/json
 
 {
-  "nombre": "Herramientas",
-  "descripcion": "Herramientas de uso general"
+  "name": "Tools",
+  "description": "General-purpose tools"
 }
 
 > {%
-    client.global.set("categoria_id", response.body.id);
+    client.global.set("category_id", response.body.id);
 %}
 
-### 2. Crear un Producto con la Categoría
-POST {{StockSync.Inventory.WebApi_HostAddress}}/api/productos
+### 2. Create a product in the category
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/products
 Content-Type: application/json
 
 {
-  "nombre": "Martillo",
+  "name": "Hammer",
   "sku": "HER-001",
-  "descripcion": "Martillo de acero",
-  "precioCompra": 10.50,
-  "precioVenta": 15.00,
-  "stockMinimo": 5,
-  "categoriaId": "{{categoria_id}}"
+  "description": "Steel hammer",
+  "purchasePrice": 10.50,
+  "salePrice": 15.00,
+  "minimumStock": 5,
+  "categoryId": "{{category_id}}"
 }
 
 > {%
-    client.global.set("producto_id", response.body.id);
+    client.global.set("product_id", response.body.id);
 %}
 
-### 3. Listar Productos de la Categoría
-GET {{StockSync.Inventory.WebApi_HostAddress}}/api/categorias/{{categoria_id}}/productos
+### 3. List products in the category
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/categories/{{category_id}}/products
 
-### 4. Intentar borrar Categoría (Debe fallar 409 Conflict)
-DELETE {{StockSync.Inventory.WebApi_HostAddress}}/api/categorias/{{categoria_id}}
+### 4. Reject category deletion with active products (409)
+DELETE {{StockSync.Inventory.WebApi_HostAddress}}/api/categories/{{category_id}}
 
-### 5. Intentar crear Categoría con mismo nombre (Debe fallar 409 Conflict)
-POST {{StockSync.Inventory.WebApi_HostAddress}}/api/categorias
+### 5. Reject a duplicate category name (409)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/categories
 Content-Type: application/json
 
 {
-  "nombre": " herramientas ",
-  "descripcion": "Duplicado"
+  "name": " tools ",
+  "description": "Duplicate"
 }
 
-### 6. Intentar crear Producto con Categoría inexistente (Debe fallar 400 Bad Request)
-POST {{StockSync.Inventory.WebApi_HostAddress}}/api/productos
+### 6. Reject an invalid category reference (400)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/products
 Content-Type: application/json
 
 {
-  "nombre": "Taladro",
+  "name": "Drill",
   "sku": "HER-002",
-  "descripcion": "Taladro",
-  "precioCompra": 50.00,
-  "precioVenta": 75.00,
-  "stockMinimo": 2,
-  "categoriaId": "00000000-0000-0000-0000-000000000000"
+  "description": "Drill",
+  "purchasePrice": 50.00,
+  "salePrice": 75.00,
+  "minimumStock": 2,
+  "categoryId": "00000000-0000-0000-0000-000000000000"
 }
 
-### 7. Asignar producto a una sucursal con saldo inicial 0
+### 7. Assign a product to a branch with zero initial stock
 POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock
 Content-Type: application/json
 
 {
-  "productoId": "{{producto_id}}",
-  "sucursalId": "11111111-1111-1111-1111-111111111111",
-  "cantidad": 0
+  "productId": "{{product_id}}",
+  "branchId": "11111111-1111-1111-1111-111111111111",
+  "quantity": 0
 }
 
 > {%
     client.global.set("stock_id", response.body.id);
 %}
 
-### 8. Entrada de 10 unidades (201, saldo 10)
-POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/entradas
+### 8. Receive 10 units (201, balance 10)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/receipts
 Content-Type: application/json
 
-{ "cantidad": 10 }
+{ "quantity": 10 }
 
-### 9. Venta de 3 unidades (201, saldo 7)
-POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/salidas
+### 9. Issue 3 units (201, balance 7)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/issues
 Content-Type: application/json
 
-{ "cantidad": 3 }
+{ "quantity": 3 }
 
-### 10. Intentar vender 8 (409, saldo sigue en 7; no genera movimiento)
-POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/salidas
+### 10. Reject an issue of 8 units (409, balance stays 7)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/issues
 Content-Type: application/json
 
-{ "cantidad": 8 }
+{ "quantity": 8 }
 
-### 11. Vender las 7 restantes (201, saldo 0)
-POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/salidas
+### 11. Issue the remaining 7 units (201, balance 0)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/issues
 Content-Type: application/json
 
-{ "cantidad": 7 }
+{ "quantity": 7 }
 
-### 12. Intentar vender sin stock (409)
-POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/salidas
+### 12. Reject an issue with no stock (409)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/issues
 Content-Type: application/json
 
-{ "cantidad": 1 }
+{ "quantity": 1 }
 
-### 13. Cantidad inválida (400)
-POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/entradas
+### 13. Reject an invalid quantity (400)
+POST {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/receipts
 Content-Type: application/json
 
-{ "cantidad": 0 }
+{ "quantity": 0 }
 
-### 14. Consultar historial (solo 3 movimientos exitosos)
-GET {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/movimientos?pagina=1&tamanoPagina=20
+### 14. Read history (three successful movements)
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}/movements?page=1&pageSize=20
 
-### 15. Consultar saldo final (0)
+### 15. Read the final balance (0)
 GET {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}
 
-### 16. El historial impide borrar la asignación (409)
+### 16. Reject assignment deletion because history exists (409)
 DELETE {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}
 
-### 17. Stock bajo mínimo: saldo 0 con mínimo 5 (aparece con faltante 5)
-GET {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/bajo-minimo?sucursalId=11111111-1111-1111-1111-111111111111
+### 17. Low stock: zero balance, minimum 5, shortage 5
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/low-stock?branchId=11111111-1111-1111-1111-111111111111
 
-### 18. Ajuste manual a 15 (200; el historial registra un movimiento Ajuste de 0 a 15)
+### 18. Adjust to 15 units (200, adjustment recorded in history)
 PUT {{StockSync.Inventory.WebApi_HostAddress}}/api/stock/{{stock_id}}
 Content-Type: application/json
 
-{ "nuevaCantidad": 15 }
+{ "newQuantity": 15 }
 
-### 19. Un producto con existencias no se puede dar de baja (409)
-DELETE {{StockSync.Inventory.WebApi_HostAddress}}/api/productos/{{producto_id}}
+### 19. Reject deactivation of a product with stock (409)
+DELETE {{StockSync.Inventory.WebApi_HostAddress}}/api/products/{{product_id}}
 
-### 20. Otro tenant no ve los datos anteriores (items vacío)
-GET {{StockSync.Inventory.WebApi_HostAddress}}/api/productos
+### 20. Another tenant cannot see the previous data (empty items)
+GET {{StockSync.Inventory.WebApi_HostAddress}}/api/products
 X-Tenant-Id: 3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b

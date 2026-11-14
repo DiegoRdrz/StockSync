@@ -10,3 +10,4 @@ export const identityRoutes = [
     rewritePrefix: `/api/${resource}`,
   })),
 ];
+

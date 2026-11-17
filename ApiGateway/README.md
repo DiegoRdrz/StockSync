@@ -40,9 +40,11 @@ Use `INVENTORY_API_URL=http://localhost:5001` for inventory in Docker or `http:/
 | `/api/inventory/categories` and subpaths | Category operations |
 | `/api/inventory/stock` and subpaths | Assignments, receipts, issues, adjustments and history |
 | `/api/inventory/movements` and subpaths | General movement listing |
+| `/api/orders` and subpaths | Sales orders on OrdersService (same path upstream) |
+| `/api/purchase-orders` and subpaths | Purchase orders on OrdersService (same path upstream) |
 | `/swagger` and subpaths | Swagger UI and OpenAPI JSON |
 
-The gateway rewrites `/api/inventory/...` to `/api/...`. For example, `/api/inventory/products` reaches `/api/products` on InventoryService. It preserves methods, request bodies, queries and backend status codes. The backend decides which operations it supports. Legacy Spanish routes are not exposed.
+Orders routes keep their path. The gateway rewrites `/api/inventory/...` to `/api/...`. For example, `/api/inventory/products` reaches `/api/products` on InventoryService. It preserves methods, request bodies, queries and backend status codes. The backend decides which operations it supports. Legacy Spanish routes are not exposed.
 
 ```sh
 curl http://localhost:9090/api/inventory/products
@@ -64,6 +66,7 @@ Other documentation is preserved. Documents are limited to 2 MiB; invalid docume
 | `HOST` | `127.0.0.1` |
 | `PORT` | `9090` |
 | `INVENTORY_API_URL` | `http://localhost:5001` |
+| `ORDERS_API_URL` | `http://localhost:5003` |
 | `UPSTREAM_TIMEOUT_MS` | `10000` |
 | `TENANT_ID` | `00000000-0000-0000-0000-000000000001` |
 | `INVENTORY_CA_FILE` | Optional PEM file for an HTTPS backend |

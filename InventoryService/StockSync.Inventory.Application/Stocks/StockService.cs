@@ -1,5 +1,6 @@
 using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Application.Common.Exceptions;
+using StockSync.Inventory.Application.IntegrationEvents;
 using StockSync.Inventory.Domain.Entities;
 using StockSync.Inventory.Domain.Repositories;
 
@@ -10,17 +11,23 @@ public class StockService : IStockService
     private readonly IStockRepository _stockRepository;
     private readonly IProductRepository _productRepository;
     private readonly IStockMovementRepository _movementRepository;
+    private readonly IIntegrationEventOutbox _outbox;
+    private readonly ICurrentTenant _currentTenant;
     private readonly IUnitOfWork _unitOfWork;
 
     public StockService(
         IStockRepository stockRepository,
         IProductRepository productRepository,
         IStockMovementRepository movementRepository,
+        IIntegrationEventOutbox outbox,
+        ICurrentTenant currentTenant,
         IUnitOfWork unitOfWork)
     {
         _stockRepository = stockRepository;
         _productRepository = productRepository;
         _movementRepository = movementRepository;
+        _outbox = outbox;
+        _currentTenant = currentTenant;
         _unitOfWork = unitOfWork;
     }
 
@@ -29,7 +36,8 @@ public class StockService : IStockService
         ThrowIfErrors(StockValidator.Validate(request));
 
         // An invalid body reference is a validation error (400), not a missing URL resource (404).
-        if (await _productRepository.GetByIdAsync(request.ProductId, cancellationToken) is null)
+        var product = await _productRepository.GetByIdAsync(request.ProductId, cancellationToken);
+        if (product is null)
             throw new ValidationException(new Dictionary<string, string[]>
             {
                 [nameof(StockRequest.ProductId)] = [$"Product '{request.ProductId}' does not exist or is inactive."]
@@ -45,7 +53,10 @@ public class StockService : IStockService
 
         await _stockRepository.AddAsync(stock, cancellationToken);
         if (initialBalance is not null)
+        {
             await _movementRepository.AddAsync(initialBalance, cancellationToken);
+            _outbox.Enqueue(StockMovementRecorded.From(initialBalance, stock, product, _currentTenant.TenantId));
+        }
         await _stockRepository.SaveChangesAsync(cancellationToken);
 
         return StockResponse.From(stock);
@@ -106,11 +117,15 @@ public class StockService : IStockService
         {
             var stock = await _stockRepository.GetForUpdateAsync(id, cancellationToken)
                 ?? throw StockNotFound(id);
-            await EnsureActiveProductAsync(stock.ProductId, cancellationToken);
+            var product = await _productRepository.GetByIdAsync(stock.ProductId, cancellationToken)
+                ?? throw new ConflictException($"Product '{stock.ProductId}' is inactive; its stock cannot be changed.");
 
             var adjustment = stock.UpdateQuantity(request.NewQuantity);
             if (adjustment is not null)
+            {
                 await _movementRepository.AddAsync(adjustment, cancellationToken);
+                _outbox.Enqueue(StockMovementRecorded.From(adjustment, stock, product, _currentTenant.TenantId));
+            }
             await _stockRepository.SaveChangesAsync(cancellationToken);
 
             return StockResponse.From(stock);
@@ -131,12 +146,6 @@ public class StockService : IStockService
             _stockRepository.Delete(stock);
             await _stockRepository.SaveChangesAsync(cancellationToken);
         }, cancellationToken);
-
-    private async Task EnsureActiveProductAsync(Guid productId, CancellationToken cancellationToken)
-    {
-        if (await _productRepository.GetByIdAsync(productId, cancellationToken) is null)
-            throw new ConflictException($"Product '{productId}' is inactive; its stock cannot be changed.");
-    }
 
     private static int Offset(StockFilter filter) => (filter.Page - 1) * filter.PageSize;
 

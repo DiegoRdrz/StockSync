@@ -26,8 +26,11 @@ services:
       - ConnectionStrings__DefaultConnection=Host=inventory-db;Database=stocksync_inventory;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
       - Initialization__ApplyMigrations=true
       - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-true}
+      - RabbitMq__ConnectionString=amqp://${RABBITMQ_USER:-stocksync}:${RABBITMQ_PASSWORD:-stocksync}@rabbitmq:5672
     depends_on:
       inventory-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
   identity-db:

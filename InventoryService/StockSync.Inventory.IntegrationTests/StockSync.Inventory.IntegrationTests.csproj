@@ -12,5 +12,6 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
     <Using Include="Xunit" />
     <ProjectReference Include="../StockSync.Inventory.Infrastructure/StockSync.Inventory.Infrastructure.csproj" />
+    <Content Include="../../docs/integration-events/stock-movement-recorded.v1.json" Link="Contracts/stock-movement-recorded.v1.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

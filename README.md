@@ -63,6 +63,12 @@ dotnet run --project StockSync.Inventory.WebApi --launch-profile http
 
 Local Swagger is at http://localhost:5041/swagger. Docker exposes the direct API at port `5001` instead. Local migrations and seeding are explicit commands; ordinary `dotnet run` does not perform them automatically. Connection strings are configured through `ConnectionStrings__DefaultConnection` or development appsettings.
 
+### Inventory movement events
+
+Inventory saves its events in the same transaction as stock movements. Configure `RabbitMq__ConnectionString` to enable the API's background publisher. Pending events remain in the outbox when the broker is unavailable or the connection string is unset.
+
+After applying migrations, run `dotnet run --project StockSync.Inventory.WebApi -- --backfill-events` from `InventoryService` to enqueue existing stock movements across all tenants. The command exits after enqueueing. Each event keeps the movement's original date, ID and balances, and uses current product metadata, including for inactive products. Movements whose product cannot be resolved are logged and skipped. Repeated runs preserve existing outbox records. Startup with `Initialization:LoadDemoData` enabled also backfills once after seeding.
+
 If macOS selects a .NET installation without the .NET 8 runtime, select the installation that contains it:
 
 ```sh

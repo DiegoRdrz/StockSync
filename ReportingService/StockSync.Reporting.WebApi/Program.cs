@@ -15,6 +15,12 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o => o.OperationFilter<TenantHeaderOperationFilter>());
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<StockSync.Reporting.Application.ISalesProjection, SalesProjection>();
+builder.Services.AddScoped<StockSync.Reporting.Application.SalesDelivery>();
+if (builder.Configuration["RabbitMq:ConnectionString"] is { Length: > 0 } broker)
+    builder.Services.AddHostedService(sp => new SalesConsumer(new Uri(broker), sp.GetRequiredService<IServiceScopeFactory>(),
+        sp.GetRequiredService<ILogger<SalesConsumer>>()));
 var app = builder.Build();
 if (migrate || app.Configuration.GetValue<bool>("Initialization:ApplyMigrations"))
 {

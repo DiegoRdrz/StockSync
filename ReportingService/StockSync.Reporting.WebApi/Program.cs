@@ -15,6 +15,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o => o.OperationFilter<TenantHeaderOperationFilter>());
+builder.Services.AddScoped<StockSync.Reporting.Application.ISalesReports, SalesReports>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<StockSync.Reporting.Application.ISalesProjection, SalesProjection>();
 builder.Services.AddScoped<StockSync.Reporting.Application.SalesDelivery>();

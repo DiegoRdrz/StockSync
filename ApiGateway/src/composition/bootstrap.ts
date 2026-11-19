@@ -7,6 +7,7 @@ import { AppModule } from './app.module.js';
 import type { GatewayOptions } from '../infrastructure/configuration/gateway-config.service.js';
 import { InventoryProxyService } from '../infrastructure/proxy/inventory-proxy.service.js';
 import { IdentityProxyService } from '../infrastructure/proxy/identity-proxy.service.js';
+import { OrdersProxyService } from '../infrastructure/proxy/orders-proxy.service.js';
 import { ProblemDetailsFilter } from '../presentation/http/filters/problem-details.filter.js';
 
 export async function createGateway(options: GatewayOptions): Promise<NestFastifyApplication> {
@@ -44,6 +45,7 @@ export async function createGateway(options: GatewayOptions): Promise<NestFastif
   // Register infrastructure routes without duplicating backend controllers.
   app.get(InventoryProxyService).registerRoutes(server);
   app.get(IdentityProxyService).registerRoutes(server);
+  app.get(OrdersProxyService).registerRoutes(server);
   await app.init();
   return app;
 }

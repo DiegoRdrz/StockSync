@@ -5,6 +5,7 @@ import { HealthService } from '../application/health/health.service.js';
 import { GATEWAY_OPTIONS, GatewayConfigService, type GatewayOptions } from '../infrastructure/configuration/gateway-config.service.js';
 import { InventoryProxyService } from '../infrastructure/proxy/inventory-proxy.service.js';
 import { IdentityProxyService } from '../infrastructure/proxy/identity-proxy.service.js';
+import { OrdersProxyService } from '../infrastructure/proxy/orders-proxy.service.js';
 
 @Module({})
 export class AppModule {
@@ -18,6 +19,7 @@ export class AppModule {
         GatewayConfigService,
         InventoryProxyService,
         IdentityProxyService,
+        OrdersProxyService,
       ],
     };
   }

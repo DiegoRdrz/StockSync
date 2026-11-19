@@ -43,11 +43,14 @@ Use `INVENTORY_API_URL=http://localhost:5001` for inventory in Docker or `http:/
 | `/api/inventory/categories` and subpaths | Category operations |
 | `/api/inventory/stock` and subpaths | Assignments, receipts, issues, adjustments and history |
 | `/api/inventory/movements` and subpaths | General movement listing |
+| `/api/orders` and subpaths | Sales orders on OrdersService (same path upstream) |
+| `/api/purchase-orders` and subpaths | Purchase orders on OrdersService (same path upstream) |
 | `/swagger` and subpaths | Swagger UI and OpenAPI JSON |
 
-The gateway proxies requests to both `IdentityService` and `InventoryService`:
+The gateway proxies requests to `IdentityService`, `InventoryService`, and `OrdersService`:
 - `/api/auth/...`, `/api/users/...`, `/api/tenants/...` reach `IdentityService`.
 - `/api/inventory/...` is rewritten to `/api/...` and reaches `InventoryService`.
+- `/api/orders/...` and `/api/purchase-orders/...` keep their path and reach `OrdersService`.
 - **Dynamic Multi-Tenancy**: When a request carries `Authorization: Bearer <token>`, the gateway automatically decodes the JWT and injects the user's `X-Tenant-Id` header to `InventoryService`. Unauthenticated requests fall back to the development `TENANT_ID`.
 
 ```sh
@@ -70,6 +73,7 @@ Other documentation is preserved. Documents are limited to 2 MiB; invalid docume
 | `HOST` | `127.0.0.1` |
 | `PORT` | `9090` |
 | `INVENTORY_API_URL` | `http://localhost:5001` |
+| `ORDERS_API_URL` | `http://localhost:5003` |
 | `UPSTREAM_TIMEOUT_MS` | `10000` |
 | `TENANT_ID` | `00000000-0000-0000-0000-000000000001` |
 | `INVENTORY_CA_FILE` | Optional PEM file for an HTTPS backend |

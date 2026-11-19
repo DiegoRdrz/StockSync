@@ -1,6 +1,6 @@
 # StockSync
 
-Multi-tenant SaaS inventory and order management platform built with microservices using **.NET 8**, **TypeScript/NestJS**, and **PostgreSQL 15**.
+Multi-tenant SaaS inventory, orders, and identity platform built with microservices using **.NET 8**, **TypeScript/NestJS**, **PostgreSQL 15**, and **RabbitMQ**.
 
 ## Available Services
 
@@ -9,10 +9,12 @@ Multi-tenant SaaS inventory and order management platform built with microservic
 | **API Gateway** | `9090` | <http://localhost:9090/swagger> | TypeScript / NestJS |
 | **Inventory Service** | `5001` | <http://localhost:5001/swagger> | .NET 8 (English) |
 | **Identity Service** | `5002` | <http://localhost:5002/swagger> | .NET 8 (English) |
+| **Orders Service** | `5003` | <http://localhost:5003/swagger> | .NET 8 (English) |
 
 For dedicated service documentation:
 - [Inventory Service Documentation](file:///InventoryService/README.md)
 - [Identity Service Documentation](file:///IdentityService/README.md)
+- [Orders Service Documentation](file:///OrdersService/README.md)
 - [API Gateway Documentation](file:///ApiGateway/README.md)
 
 ## Run with Docker
@@ -40,7 +42,7 @@ The image enables `Initialization__ApplyMigrations=true`. With multiple API repl
 
 ![Project architecture](Assets/Diagram.png)
 
-The diagram includes planned services; this repository currently implements inventory and its gateway.
+The diagram includes planned services; this repository currently implements inventory, orders and the gateway. See [Orders service](#orders-service).
 
 ## Run locally
 
@@ -149,6 +151,37 @@ This branch changes public routes, JSON fields, query parameters, movement value
 
 Historical migrations and their old database names are intentionally retained so existing migration histories remain valid. Legacy names also appear in the upgrade/rollback migration because those are the objects it must rename. Existing user-entered product names and descriptions are data and are not automatically translated.
 
+## Orders service
+
+`OrdersService/` manages sales orders and supplier purchase orders with its own database (`stocksync_orders`). In Docker the direct API is http://localhost:5003/swagger; locally it runs on http://localhost:5045 with `dotnet run --project StockSync.Orders.WebApi --launch-profile http` from `OrdersService` (start `orders-db`, `rabbitmq` and InventoryService first, then run `dotnet ef database update --project StockSync.Orders.Infrastructure --startup-project StockSync.Orders.WebApi` with `ASPNETCORE_ENVIRONMENT=Development`). The gateway forwards `/api/orders` and `/api/purchase-orders` unchanged. RabbitMQ management is at http://localhost:15672 (`RABBITMQ_USER` / `RABBITMQ_PASSWORD`, default `stocksync`).
+
+| Route | Purpose |
+| --- | --- |
+| `POST /api/orders` | Create a draft sale for a branch (`branchId`, `notes`) |
+| `GET /api/orders/{id}`, `GET /api/orders` | Get one order; list with `status`, `branchId`, `from`, `to`, `page`, `pageSize` |
+| `POST /api/orders/{id}/lines` | Add a product (`productId`, `quantity`); the price is the Inventory `salePrice` |
+| `PUT` / `DELETE /api/orders/{id}/lines/{lineId}` | Change the quantity or remove a line while in draft |
+| `POST /api/orders/{id}/confirm` | Issue stock in Inventory and confirm the sale |
+| `POST /api/orders/{id}/cancel` | Cancel a draft sale |
+| `/api/purchase-orders/...` | Same operations with `supplierName`; prices use the Inventory `purchasePrice`; `place` sends the order and `receive` records stock receipts |
+
+Order statuses are `Draft`, `Confirming`, `Confirmed`, `RequiresReview` and `Cancelled`. Purchase order statuses are `Draft`, `Ordered`, `Receiving`, `Received`, `RequiresReview` and `Cancelled`. Lines can change only in draft; a product appears once per document; quantities and prices must be greater than zero; totals are calculated by the domain. Confirmed sales cannot be cancelled (returns are not implemented).
+
+### Stock consistency
+
+Inventory has no batch or idempotent movement endpoint, so confirmation is an orchestrated saga with compensation and no changes to Inventory:
+
+1. The order is locked and moved to `Confirming` in its own transaction, which blocks edits and a second confirmation.
+2. Orders calls `POST /api/stock/{stockId}/issues` for each line and saves the returned movement ID after every call.
+3. If Inventory refuses a line (for example insufficient stock, 409), the issued lines are reversed with `receipts`, the order returns to `Draft` and the API answers 409. If Inventory cannot be reached before anything is issued, the order returns to `Draft` with 503.
+4. If a result is unknown (timeout, 5xx or a lost connection after sending), Orders never retries, because a retry could issue stock twice. The order moves to `RequiresReview` with the reason, the API answers 503, and a person reconciles it with the movement IDs stored on each line and the Inventory movement history.
+
+Receiving a purchase order uses the same saga with receipts, compensated with issues. Calls go directly to `http://inventory-api:8080` with the caller's `X-Tenant-Id`; the request is not cancelled halfway even if the client disconnects.
+
+### Integration events
+
+`OrderCreated` and `SaleConfirmed` are written to `OutboxMessages` in the same transaction as the order change (transactional outbox) and published by a background worker to the durable topic exchange `stocksync.events` with routing keys `orders.order-created.v1` and `orders.sale-confirmed.v1`. Each message has the event ID as `message_id`, the event type as `type` and a `tenant-id` header; the JSON body uses camelCase. Delivery is at least once, so consumers must deduplicate by event ID and declare their own queues. `SaleConfirmed` is informational: Inventory has already issued the stock, so consuming it to decrement stock again would double the decrement. Without `RabbitMq:ConnectionString`, events stay in the outbox.
+
 ## Inventory service checks
 
 From `InventoryService`:
@@ -161,4 +194,4 @@ STOCKSYNC_TEST_POSTGRES='Host=localhost;Database=postgres;Username=postgres;Pass
   dotnet test StockSync.Inventory.sln
 ```
 
-Without that variable, PostgreSQL integration checks are skipped. Each integration check creates and removes its own database rather than changing application data. The gateway has no test directory; use `npm run typecheck` and `npm run build` to check it.
+Run the same commands from `OrdersService` with `StockSync.Orders.sln` for the orders service. Without that variable, PostgreSQL integration checks are skipped. Each integration check creates and removes its own database rather than changing application data. The gateway has no test directory; use `npm run typecheck` and `npm run build` to check it.

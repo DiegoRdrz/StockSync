@@ -1,0 +1,71 @@
+@StockSync.Orders.WebApi_HostAddress = http://localhost:5045
+@branch_id = 11111111-1111-1111-1111-111111111111
+
+# Requires InventoryService with demo data. Copy IDs from Inventory:
+# GET http://localhost:5041/api/stock/branch/11111111-1111-1111-1111-111111111111
+@product_id = PRODUCT_ID
+@order_id = ORDER_ID
+@line_id = LINE_ID
+@purchase_order_id = PURCHASE_ORDER_ID
+
+### 1. Create a sales order (201, Draft)
+POST {{StockSync.Orders.WebApi_HostAddress}}/api/orders
+Content-Type: application/json
+
+{
+  "branchId": "{{branch_id}}",
+  "notes": "Counter sale"
+}
+
+### 2. Add a line; the unit price is the product's sale price in Inventory (200)
+POST {{StockSync.Orders.WebApi_HostAddress}}/api/orders/{{order_id}}/lines
+Content-Type: application/json
+
+{
+  "productId": "{{product_id}}",
+  "quantity": 2
+}
+
+### 3. Change the line quantity (200)
+PUT {{StockSync.Orders.WebApi_HostAddress}}/api/orders/{{order_id}}/lines/{{line_id}}
+Content-Type: application/json
+
+{
+  "quantity": 1
+}
+
+### 4. Confirm: issues stock in Inventory (200 Confirmed; 409 insufficient stock; 503 Inventory unavailable)
+POST {{StockSync.Orders.WebApi_HostAddress}}/api/orders/{{order_id}}/confirm
+
+### 5. Get the order with its lines and stock movement IDs (200)
+GET {{StockSync.Orders.WebApi_HostAddress}}/api/orders/{{order_id}}
+
+### 6. List orders with filters (200)
+GET {{StockSync.Orders.WebApi_HostAddress}}/api/orders?status=Confirmed&branchId={{branch_id}}&from=2026-01-01&page=1&pageSize=20
+
+### 7. Cancel a draft order (200; 409 for a confirmed order)
+POST {{StockSync.Orders.WebApi_HostAddress}}/api/orders/{{order_id}}/cancel
+
+### 8. Create a purchase order (201, Draft)
+POST {{StockSync.Orders.WebApi_HostAddress}}/api/purchase-orders
+Content-Type: application/json
+
+{
+  "branchId": "{{branch_id}}",
+  "supplierName": "Acme Tools"
+}
+
+### 9. Add a line; the unit cost is the product's purchase price in Inventory (200)
+POST {{StockSync.Orders.WebApi_HostAddress}}/api/purchase-orders/{{purchase_order_id}}/lines
+Content-Type: application/json
+
+{
+  "productId": "{{product_id}}",
+  "quantity": 10
+}
+
+### 10. Place the purchase order with the supplier (200, Ordered)
+POST {{StockSync.Orders.WebApi_HostAddress}}/api/purchase-orders/{{purchase_order_id}}/place
+
+### 11. Receive the goods: records receipts in Inventory (200, Received)
+POST {{StockSync.Orders.WebApi_HostAddress}}/api/purchase-orders/{{purchase_order_id}}/receive

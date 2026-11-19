@@ -58,7 +58,8 @@ public class SalesPostgresTests : PostgresTestBase
         Assert.Contains(ProjectionResult.Applied, results);
         Assert.Contains(ProjectionResult.Duplicate, results);
         await using var db = CreateContext(sale.TenantId);
-        Assert.Single(await db.Database.GetAppliedMigrationsAsync());
+        Assert.Equal(new[] { "20261119000000_InitialReporting", "20261119234545_PurchasesAndInventory" },
+            await db.Database.GetAppliedMigrationsAsync());
         Assert.Single(await db.ProcessedEvents.ToListAsync());
         Assert.Single(await db.Sales.ToListAsync());
         Assert.Single(await db.SaleLines.ToListAsync());

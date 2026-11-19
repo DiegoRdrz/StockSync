@@ -25,6 +25,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="../../docs/integration-events/sale-confirmed.v1.json" Link="Contracts/sale-confirmed.v1.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../docs/integration-events/*.v1.json" Link="Contracts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -1,3 +1,4 @@
+using StockSync.Reporting.Application;
 using Microsoft.EntityFrameworkCore;
 using StockSync.Reporting.Application.Common;
 using StockSync.Reporting.Infrastructure;
@@ -15,13 +16,21 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(o => o.OperationFilter<TenantHeaderOperationFilter>());
-builder.Services.AddScoped<StockSync.Reporting.Application.ISalesReports, SalesReports>();
+builder.Services.AddScoped<ISalesReports, SalesReports>();
+builder.Services.AddScoped<IPurchaseReports, PurchaseReports>();
+builder.Services.AddScoped<IInventoryReports, InventoryReports>();
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddScoped<StockSync.Reporting.Application.ISalesProjection, SalesProjection>();
-builder.Services.AddScoped<StockSync.Reporting.Application.SalesDelivery>();
+builder.Services.AddScoped<IProjection<SaleConfirmed>, SalesProjection>();
+builder.Services.AddScoped<IProjection<PurchaseOrderReceived>, PurchaseProjection>();
+builder.Services.AddScoped<IProjection<StockMovementRecorded>, StockMovementProjection>();
+builder.Services.AddScoped(typeof(EventDelivery<>));
 if (builder.Configuration["RabbitMq:ConnectionString"] is { Length: > 0 } broker)
-    builder.Services.AddHostedService(sp => new SalesConsumer(new Uri(broker), sp.GetRequiredService<IServiceScopeFactory>(),
-        sp.GetRequiredService<ILogger<SalesConsumer>>()));
+{
+    var uri = new Uri(broker);
+    RegisterConsumer<SaleConfirmed>(builder.Services, uri);
+    RegisterConsumer<PurchaseOrderReceived>(builder.Services, uri);
+    RegisterConsumer<StockMovementRecorded>(builder.Services, uri);
+}
 var app = builder.Build();
 if (migrate || app.Configuration.GetValue<bool>("Initialization:ApplyMigrations"))
 {
@@ -38,3 +47,7 @@ app.UseExceptionHandler();
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.MapControllers();
 app.Run();
+
+static void RegisterConsumer<T>(IServiceCollection services, Uri broker) where T : class, IReportingEvent<T> =>
+    services.AddHostedService(sp => new ReportingConsumer<T>(broker, sp.GetRequiredService<IServiceScopeFactory>(),
+        sp.GetRequiredService<ILogger<ReportingConsumer<T>>>()));

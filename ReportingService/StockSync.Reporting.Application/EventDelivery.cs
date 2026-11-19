@@ -3,24 +3,24 @@ using System.Text.Json;
 namespace StockSync.Reporting.Application;
 
 public enum ProjectionResult { Applied, Duplicate }
-public interface ISalesProjection
+public interface IProjection<in T>
 {
-    Task<ProjectionResult> ApplyAsync(SaleConfirmed sale, CancellationToken token);
+    Task<ProjectionResult> ApplyAsync(T message, CancellationToken token);
 }
 
-public sealed class SalesDelivery(ISalesProjection projection, TimeProvider clock)
+public sealed class EventDelivery<T>(IProjection<T> projection, TimeProvider clock) where T : class, IReportingEvent<T>
 {
     public async Task<bool> ShouldAcknowledgeAsync(ReadOnlyMemory<byte> body, string key, string? type,
         string? id, string? tenant, Action<string> log, CancellationToken token)
     {
-        SaleConfirmed sale;
+        T message;
         try
         {
-            sale = SaleConfirmed.Parse(body, key, type, id, tenant);
+            message = ReportingEvent.Parse<T>(body, key, type, id, tenant);
         }
         catch (Exception ex) when (ex is JsonException or InvalidDataException)
         {
-            log(ex is JsonException ? "Invalid sales JSON or field type." : ex.Message);
+            log(ex is JsonException ? "Invalid event JSON or field type." : ex.Message);
             return false;
         }
 
@@ -28,12 +28,12 @@ public sealed class SalesDelivery(ISalesProjection projection, TimeProvider cloc
         {
             try
             {
-                var outcome = await projection.ApplyAsync(sale, token);
+                var outcome = await projection.ApplyAsync(message, token);
                 return outcome is ProjectionResult.Applied or ProjectionResult.Duplicate;
             }
             catch (Exception ex) when (!token.IsCancellationRequested)
             {
-                log($"Sales projection attempt {attempt} failed ({ex.GetType().Name}).");
+                log($"Projection attempt {attempt} failed ({ex.GetType().Name}).");
                 if (attempt == 3) return false;
                 await Task.Delay(TimeSpan.FromMilliseconds(100 * (1 << (attempt - 1))), clock, token);
             }

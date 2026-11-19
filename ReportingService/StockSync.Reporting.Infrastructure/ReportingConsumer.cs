@@ -8,14 +8,15 @@ using StockSync.Reporting.Application;
 
 namespace StockSync.Reporting.Infrastructure;
 
-public sealed class SalesConsumer(Uri broker, IServiceScopeFactory scopes, ILogger<SalesConsumer> logger) : BackgroundService
+public sealed class ReportingConsumer<T>(Uri broker, IServiceScopeFactory scopes, ILogger<ReportingConsumer<T>> logger) : BackgroundService
+    where T : class, IReportingEvent<T>
 {
     public const string Exchange = "stocksync.events";
     public const string DeadLetterExchange = "reporting.dlx";
 
-    public static async Task DeclareAsync(IChannel channel, string queue, CancellationToken token)
+    public static async Task DeclareAsync(IChannel channel, string queue, CancellationToken token, string exchange = Exchange)
     {
-        await channel.ExchangeDeclareAsync(Exchange, ExchangeType.Topic, durable: true, autoDelete: false, cancellationToken: token);
+        await channel.ExchangeDeclareAsync(exchange, ExchangeType.Topic, durable: true, autoDelete: false, cancellationToken: token);
         await channel.ExchangeDeclareAsync(DeadLetterExchange, ExchangeType.Direct, durable: true, autoDelete: false, cancellationToken: token);
         var error = queue + ".error";
         await channel.QueueDeclareAsync(error, durable: true, exclusive: false, autoDelete: false, cancellationToken: token);
@@ -23,7 +24,7 @@ public sealed class SalesConsumer(Uri broker, IServiceScopeFactory scopes, ILogg
         await channel.QueueDeclareAsync(queue, durable: true, exclusive: false, autoDelete: false,
             arguments: new Dictionary<string, object?> { ["x-dead-letter-exchange"] = DeadLetterExchange, ["x-dead-letter-routing-key"] = error },
             cancellationToken: token);
-        await channel.QueueBindAsync(queue, Exchange, SaleConfirmed.RoutingKey, cancellationToken: token);
+        await channel.QueueBindAsync(queue, exchange, T.RoutingKey, cancellationToken: token);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -35,20 +36,20 @@ public sealed class SalesConsumer(Uri broker, IServiceScopeFactory scopes, ILogg
             {
                 await using var connection = await factory.CreateConnectionAsync(stoppingToken);
                 await using var channel = await connection.CreateChannelAsync(cancellationToken: stoppingToken);
-                await ConsumeAsync(channel, SalesProjection.ConsumerName, stoppingToken);
+                await ConsumeAsync(channel, T.ConsumerName, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
             catch (Exception ex)
             {
-                logger.LogWarning("Sales subscription interrupted ({Reason}).", ex.GetType().Name);
+                logger.LogWarning("Subscription {Queue} interrupted ({Reason}).", T.ConsumerName, ex.GetType().Name);
             }
             await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
         }
     }
 
-    public async Task ConsumeAsync(IChannel channel, string queue, CancellationToken token)
+    public async Task ConsumeAsync(IChannel channel, string queue, CancellationToken token, string exchange = Exchange)
     {
-        await DeclareAsync(channel, queue, token);
+        await DeclareAsync(channel, queue, token, exchange);
         await channel.BasicQosAsync(0, 1, false, token);
         // A single reader owns settlement and shutdown. Copy the body before the callback returns.
         var inbox = System.Threading.Channels.Channel.CreateUnbounded<Delivery>();
@@ -68,9 +69,9 @@ public sealed class SalesConsumer(Uri broker, IServiceScopeFactory scopes, ILogg
         await foreach (var delivery in inbox.Reader.ReadAllAsync(token))
         {
             await using var scope = scopes.CreateAsyncScope();
-            var handler = scope.ServiceProvider.GetRequiredService<SalesDelivery>();
+            var handler = scope.ServiceProvider.GetRequiredService<EventDelivery<T>>();
             var ack = await handler.ShouldAcknowledgeAsync(delivery.Body, delivery.Key, delivery.Type, delivery.Id,
-                delivery.Tenant, reason => logger.LogWarning("Sales delivery: {Reason}", reason), token);
+                delivery.Tenant, reason => logger.LogWarning("{Queue} delivery: {Reason}", queue, reason), token);
             if (ack)
                 await channel.BasicAckAsync(delivery.Tag, false, token);
             else

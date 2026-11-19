@@ -17,10 +17,19 @@ public sealed class RabbitMqFactAttribute : FactAttribute
     }
 }
 
-public class SalesRabbitMqTests
+public class RabbitMqTests
 {
     [RabbitMqFact]
-    public async Task InvalidDeliveryReachesIsolatedErrorQueue()
+    public Task InvalidSaleReachesItsErrorQueue() => RejectDelivery<SaleConfirmed, SalesProjection>();
+
+    [RabbitMqFact]
+    public Task InvalidPurchaseReachesItsErrorQueue() => RejectDelivery<PurchaseOrderReceived, PurchaseProjection>();
+
+    [RabbitMqFact]
+    public Task InvalidMovementReachesItsErrorQueue() => RejectDelivery<StockMovementRecorded, StockMovementProjection>();
+
+    private static async Task RejectDelivery<T, TProjection>()
+        where T : class, IReportingEvent<T> where TProjection : class, IProjection<T>
     {
         var broker = new Uri(Environment.GetEnvironmentVariable("STOCKSYNC_TEST_RABBITMQ")!);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -31,13 +40,14 @@ public class SalesRabbitMqTests
         await using var services = new ServiceCollection().AddSingleton(TimeProvider.System)
             .AddScoped<TenantContext>().AddScoped<ICurrentTenant>(sp => sp.GetRequiredService<TenantContext>())
             .AddDbContext<ReportingDbContext>(o => o.UseNpgsql())
-            .AddScoped<ISalesProjection, SalesProjection>().AddScoped<SalesDelivery>().BuildServiceProvider();
-        var worker = new SalesConsumer(broker, services.GetRequiredService<IServiceScopeFactory>(), NullLogger<SalesConsumer>.Instance);
+            .AddScoped<IProjection<T>, TProjection>().AddScoped<EventDelivery<T>>().BuildServiceProvider();
+        var worker = new ReportingConsumer<T>(broker, services.GetRequiredService<IServiceScopeFactory>(), NullLogger<ReportingConsumer<T>>.Instance);
         var queue = $"reporting.test.{Guid.NewGuid():N}";
+        var exchange = queue + ".events";
         var error = queue + ".error";
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
-        await SalesConsumer.DeclareAsync(producer, queue, token);
-        var run = worker.ConsumeAsync(subscription, queue, stop.Token);
+        await ReportingConsumer<T>.DeclareAsync(producer, queue, token, exchange);
+        var run = worker.ConsumeAsync(subscription, queue, stop.Token, exchange);
         try
         {
             // The default exchange routes this invalid delivery only to this test's queue.
@@ -58,6 +68,7 @@ public class SalesRabbitMqTests
             try { await run; } catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
             await producer.QueueDeleteAsync(queue, false, false);
             await producer.QueueDeleteAsync(error, false, false);
+            await producer.ExchangeDeleteAsync(exchange, cancellationToken: token);
         }
     }
 }

@@ -11,7 +11,7 @@ public class SalesContractTests
     {
         using var json = JsonDocument.Parse(Fixture);
         var body = json.RootElement;
-        return SaleConfirmed.Parse(Fixture, SaleConfirmed.RoutingKey, SaleConfirmed.RoutingKey,
+        return ReportingEvent.Parse<SaleConfirmed>(Fixture, SaleConfirmed.RoutingKey, SaleConfirmed.RoutingKey,
             body.GetProperty("eventId").GetString(), body.GetProperty("tenantId").GetString());
     }
 

@@ -15,9 +15,14 @@ public sealed record SalesFilter(DateTime From, DateTime To, Guid? BranchId)
         var start = ParseUtc(from, "From") ?? end.AddDays(-30);
         if (start > end || end - start > TimeSpan.FromDays(366))
             throw Invalid("From", "The inclusive date range must be ordered and at most 366 days.");
+        ValidateBranch(branchId);
+        return new(start, end, branchId);
+    }
+
+    public static void ValidateBranch(Guid? branchId)
+    {
         if (branchId == Guid.Empty)
             throw Invalid("BranchId", "A valid branch GUID is required.");
-        return new(start, end, branchId);
     }
 
     private static DateTime? ParseUtc(string? value, string field)

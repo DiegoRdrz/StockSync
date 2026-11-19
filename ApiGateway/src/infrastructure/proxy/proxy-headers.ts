@@ -31,4 +31,22 @@ export function toPublicLocation(value: string, target: URL): string {
   }
 }
 
+export function extractTenantFromAuthorization(authHeader?: string): string | null {
+  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) return null;
+  const token = authHeader.slice(7).trim();
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const payloadJson = Buffer.from(parts[1], 'base64url').toString('utf8');
+    const payload = JSON.parse(payloadJson);
+    const tenantId = payload.tenant_id || payload.TenantId;
+    if (typeof tenantId === 'string' && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(tenantId)) {
+      return tenantId;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export { cleanHeaders };

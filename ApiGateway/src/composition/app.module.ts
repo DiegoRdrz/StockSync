@@ -4,6 +4,7 @@ import { HealthController } from '../presentation/http/controllers/health.contro
 import { HealthService } from '../application/health/health.service.js';
 import { GATEWAY_OPTIONS, GatewayConfigService, type GatewayOptions } from '../infrastructure/configuration/gateway-config.service.js';
 import { InventoryProxyService } from '../infrastructure/proxy/inventory-proxy.service.js';
+import { IdentityProxyService } from '../infrastructure/proxy/identity-proxy.service.js';
 import { OrdersProxyService } from '../infrastructure/proxy/orders-proxy.service.js';
 
 @Module({})
@@ -17,6 +18,7 @@ export class AppModule {
         { provide: GATEWAY_OPTIONS, useValue: options },
         GatewayConfigService,
         InventoryProxyService,
+        IdentityProxyService,
         OrdersProxyService,
       ],
     };

@@ -1,14 +1,15 @@
 import { readFileSync } from 'node:fs';
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
-  const upstream = readUpstream(env.INVENTORY_API_URL || 'http://localhost:5001');
+  const upstream = readUpstream(env.INVENTORY_API_URL || 'http://localhost:5001', 'INVENTORY_API_URL');
+  const identityUpstream = readUpstream(env.IDENTITY_API_URL || 'http://localhost:5002', 'IDENTITY_API_URL');
   const ordersUpstream = readUpstream(env.ORDERS_API_URL || 'http://localhost:5003', 'ORDERS_API_URL');
   const port = readPositiveInteger(env.PORT || '9090', 'PORT', 65535);
   const timeoutMs = readPositiveInteger(env.UPSTREAM_TIMEOUT_MS || '10000', 'UPSTREAM_TIMEOUT_MS', 300000);
   const tenantId = readTenantId(env.TENANT_ID || '00000000-0000-0000-0000-000000000001');
   const caPem = env.INVENTORY_CA_FILE ? readFileSync(env.INVENTORY_CA_FILE, 'utf8') : '';
 
-  return { upstream, ordersUpstream, port, timeoutMs, caPem, tenantId, host: env.HOST || '127.0.0.1' };
+  return { upstream, identityUpstream, ordersUpstream, port, timeoutMs, caPem, tenantId, host: env.HOST || '127.0.0.1' };
 }
 
 function readUpstream(value: string, name = 'INVENTORY_API_URL'): URL {

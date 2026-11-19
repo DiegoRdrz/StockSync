@@ -1,6 +1,21 @@
 # StockSync
 
-Inventory and Orders APIs built with .NET 8 and PostgreSQL 15, exposed through a TypeScript/NestJS API gateway in `ApiGateway/`. Orders publishes integration events to RabbitMQ.
+Multi-tenant SaaS inventory, orders, and identity platform built with microservices using **.NET 8**, **TypeScript/NestJS**, **PostgreSQL 15**, and **RabbitMQ**.
+
+## Available Services
+
+| Service | Docker Port | Swagger UI | Language |
+|---|---|---|---|
+| **API Gateway** | `9090` | <http://localhost:9090/swagger> | TypeScript / NestJS |
+| **Inventory Service** | `5001` | <http://localhost:5001/swagger> | .NET 8 (English) |
+| **Identity Service** | `5002` | <http://localhost:5002/swagger> | .NET 8 (English) |
+| **Orders Service** | `5003` | <http://localhost:5003/swagger> | .NET 8 (English) |
+
+For dedicated service documentation:
+- [Inventory Service Documentation](file:///InventoryService/README.md)
+- [Identity Service Documentation](file:///IdentityService/README.md)
+- [Orders Service Documentation](file:///OrdersService/README.md)
+- [API Gateway Documentation](file:///ApiGateway/README.md)
 
 ## Run with Docker
 

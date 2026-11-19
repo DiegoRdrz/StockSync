@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 export const GATEWAY_OPTIONS = Symbol('GATEWAY_OPTIONS');
 export interface GatewayOptions {
   upstream: string | URL;
+  ordersUpstream?: string | URL;
   timeoutMs?: number;
   logger?: boolean;
   caPem?: string;
@@ -14,6 +15,7 @@ export class GatewayConfigService {
   readonly options: Required<GatewayOptions>;
   constructor(@Inject(GATEWAY_OPTIONS) options: GatewayOptions) {
     this.options = {
+      ordersUpstream: 'http://localhost:5003',
       timeoutMs: 10000,
       logger: true,
       caPem: '',

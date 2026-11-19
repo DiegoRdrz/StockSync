@@ -10,7 +10,9 @@ public sealed record SalesFilter(DateTime From, DateTime To, Guid? BranchId)
     public static SalesFilter Create(string? from, string? to, Guid? branchId, DateTime now)
     {
         var end = ParseUtc(to, "To") ?? now;
-        var start = ParseUtc(from, "From") ?? end.AddDays(-Math.Min(30, (end - DateTime.MinValue).Days));
+        if (from is null && end < DateTime.MinValue.AddDays(30))
+            throw Invalid("From", "Specify a start date for this end date.");
+        var start = ParseUtc(from, "From") ?? end.AddDays(-30);
         if (start > end || end - start > TimeSpan.FromDays(366))
             throw Invalid("From", "The inclusive date range must be ordered and at most 366 days.");
         if (branchId == Guid.Empty)

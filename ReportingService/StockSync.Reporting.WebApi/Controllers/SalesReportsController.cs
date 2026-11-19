@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using StockSync.Reporting.Application;
 using StockSync.Reporting.Application.Common;
+using StockSync.Reporting.Application.Common.Exceptions;
 
 namespace StockSync.Reporting.WebApi.Controllers;
 
@@ -15,8 +16,16 @@ public sealed class ReportQuery
 [Route("api/reports/sales")]
 public sealed class SalesReportsController(ISalesReports reports, TimeProvider clock) : ControllerBase
 {
-    private SalesFilter Filter(ReportQuery query) => SalesFilter.Create(query.From, query.To, query.BranchId,
-        clock.GetUtcNow().UtcDateTime);
+    private SalesFilter Filter(ReportQuery query)
+    {
+        foreach (var field in new[] { "from", "to", "branchId" })
+        {
+            if (Request.Query.TryGetValue(field, out var values) &&
+                (values.Count != 1 || string.IsNullOrWhiteSpace(values[0])))
+                throw new ValidationException(new Dictionary<string, string[]> { [field] = ["Supply one value."] });
+        }
+        return SalesFilter.Create(query.From, query.To, query.BranchId, clock.GetUtcNow().UtcDateTime);
+    }
 
     [HttpGet("summary")]
     public Task<SalesSummary> Summary([FromQuery] ReportQuery query, CancellationToken token) =>

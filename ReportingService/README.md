@@ -18,3 +18,7 @@ Send a non-empty GUID in X-Tenant-Id on every GET request. All four routes accep
 | /api/reports/sales/daily | Amount, count and units by UTC day |
 | /api/reports/sales/top-products | Products ranked by quantity, revenue and product ID. Limit defaults to 10 and accepts 1 through 50. |
 | /api/reports/sales | Details ordered by confirmation time descending then order ID. Page starts at 1. Page size defaults to 20 and accepts 1 through 100. |
+
+## Verification
+
+From ReportingService run `dotnet build StockSync.Reporting.sln` and `dotnet test StockSync.Reporting.sln`. Set STOCKSYNC_TEST_POSTGRES to an administrative PostgreSQL connection string with CREATE DATABASE permission for isolated database tests. Set STOCKSYNC_TEST_RABBITMQ to a development AMQP URI for the broker test. It creates uniquely named sales and error queues and deletes them after the test. From the repository root run `docker compose config --quiet` and `docker compose build reporting-api`.

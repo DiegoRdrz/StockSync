@@ -182,6 +182,8 @@ Receiving a purchase order uses the same saga with receipts, compensated with is
 
 `OrderCreated` and `SaleConfirmed` are written to `OutboxMessages` in the same transaction as the order change (transactional outbox) and published by a background worker to the durable topic exchange `stocksync.events` with routing keys `orders.order-created.v1` and `orders.sale-confirmed.v1`. Each message has the event ID as `message_id`, the event type as `type` and a `tenant-id` header; the JSON body uses camelCase. Delivery is at least once, so consumers must deduplicate by event ID and declare their own queues. `SaleConfirmed` is informational: Inventory has already issued the stock, so consuming it to decrement stock again would double the decrement. Without `RabbitMq:ConnectionString`, events stay in the outbox.
 
+See the [integration event contracts and development replay instructions](docs/integration-events.md).
+
 ## Inventory service checks
 
 From `InventoryService`:

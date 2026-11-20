@@ -2,6 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 
 export const GATEWAY_OPTIONS = Symbol('GATEWAY_OPTIONS');
 export interface GatewayOptions {
+  jwtSecret: string;
+  jwtIssuer: string;
+  jwtAudience: string;
   upstream: string | URL;
   identityUpstream?: string | URL;
   ordersUpstream?: string | URL;

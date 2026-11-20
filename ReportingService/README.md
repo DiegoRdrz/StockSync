@@ -10,15 +10,15 @@ ReportingService provides read-only sales, purchasing and inventory reports. Its
 | `RabbitMq__ConnectionString` | AMQP URI. The local .NET profile connects to the Compose broker at `amqp://stocksync:stocksync@localhost:5672` by default. If unset, the API serves existing projections and consumes no events. |
 | `Initialization__ApplyMigrations` | Compose sets it to `true` so the service migrates before accepting traffic or consuming events. |
 
-From the repository root, start Reporting and its dependencies with Docker:
+After provisioning the root Compose environment (including `JWT_SECRET_KEY`), start Reporting and its dependencies from the repository root:
 
 ```sh
 docker compose up -d --build reporting-api
 ```
 
-Use port 5004 for the direct API and development Swagger. The full stack also exposes `/api/reports` through the gateway on port 9090. RabbitMQ management is available on port 15672 with the root Compose credentials.
+Use the full stack and query `/api/reports` on gateway port 9090. Reporting listens on port 8080 inside its private networks.
 
-For a local .NET run, start `reporting-db` and `rabbitmq` with `docker compose up -d reporting-db rabbitmq`. From `ReportingService`, apply migrations and start the HTTP profile:
+For a local .NET run, start `reporting-db` and `rabbitmq` with `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d reporting-db rabbitmq`. From `ReportingService`, apply migrations and start the HTTP profile:
 
 ```sh
 dotnet run --project StockSync.Reporting.WebApi --launch-profile http -- --migrate
@@ -43,7 +43,7 @@ To reprocess an error in development, inspect the logged reason and correct the 
 
 ## Report queries
 
-For direct API calls, send a non-empty GUID in `X-Tenant-Id`. The gateway sets this header from the JWT tenant claim or the configured development fallback. Sales, purchase and movement reports accept inclusive UTC from and to and an optional branchId. Date-only input denotes midnight UTC. The default window ends now and starts 30 days before the selected end. The maximum range is 366 days.
+Send an Identity bearer access token when calling the gateway. Reporting receives the verified tenant in `X-Tenant-Id`. Direct local HTTP calls require that header and a trusted host. Sales, purchase and movement reports accept inclusive UTC from and to and an optional branchId. Date-only input denotes midnight UTC. The default window ends now and starts 30 days before the selected end. The maximum range is 366 days.
 
 | Route | Result |
 | --- | --- |
@@ -75,7 +75,7 @@ For local development, run `dotnet run --project StockSync.Inventory.WebApi -- -
 - A stock assignment with zero initial quantity produces no movement and stays absent from low-stock until its first movement.
 - A product name or minimum-stock change reaches Reporting with the next movement carrying that metadata.
 - Inventory reports include saga compensation movements as receipts or issues.
-- Inventory and Reporting trust the JWT tenant claim at the development gateway. The gateway does not verify the JWT signature. Orders uses a fixed development tenant.
+- Reporting trusts the gateway and internal network peers. RabbitMQ consumers resolve tenants from matching event headers and payloads in a fresh scope per delivery. Restrict broker access to trusted producers and operators.
 - Backfill uses current product metadata for historical movements.
 
 ## Verification

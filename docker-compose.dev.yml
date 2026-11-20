@@ -1,0 +1,30 @@
+services:
+  inventory-db:
+    networks:
+      - dev-tools
+    ports:
+      - "127.0.0.1:5432:5432"
+  identity-db:
+    networks:
+      - dev-tools
+    ports:
+      - "127.0.0.1:5433:5432"
+  orders-db:
+    networks:
+      - dev-tools
+    ports:
+      - "127.0.0.1:5434:5432"
+  reporting-db:
+    networks:
+      - dev-tools
+    ports:
+      - "127.0.0.1:5435:5432"
+  rabbitmq:
+    networks:
+      - dev-tools
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+
+networks:
+  dev-tools: {}

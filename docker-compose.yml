@@ -26,8 +26,11 @@ services:
       - ConnectionStrings__DefaultConnection=Host=inventory-db;Database=stocksync_inventory;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
       - Initialization__ApplyMigrations=true
       - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-true}
+      - RabbitMq__ConnectionString=amqp://${RABBITMQ_USER:-stocksync}:${RABBITMQ_PASSWORD:-stocksync}@rabbitmq:5672
     depends_on:
       inventory-db:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
   identity-db:
@@ -91,7 +94,8 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      # Run diagnostics as the broker user so a startup probe cannot create a root-owned cookie.
+      test: ["CMD", "su-exec", "rabbitmq", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -116,6 +120,39 @@ services:
       inventory-api:
         condition: service_started
 
+  reporting-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stock1234}
+      POSTGRES_DB: stocksync_reporting
+    ports:
+      - "5435:5432"
+    volumes:
+      - reporting_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stocksync_reporting"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  reporting-api:
+    build:
+      context: ./ReportingService
+      dockerfile: StockSync.Reporting.WebApi/Dockerfile
+    ports:
+      - "5004:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=reporting-db;Database=stocksync_reporting;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
+      - Initialization__ApplyMigrations=true
+      - RabbitMq__ConnectionString=amqp://${RABBITMQ_USER:-stocksync}:${RABBITMQ_PASSWORD:-stocksync}@rabbitmq:5672
+    depends_on:
+      reporting-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   api-gateway:
     build:
       context: ./ApiGateway
@@ -127,6 +164,7 @@ services:
       INVENTORY_API_URL: http://inventory-api:8080
       IDENTITY_API_URL: http://identity-api:8080
       ORDERS_API_URL: http://orders-api:8080
+      REPORTING_API_URL: http://reporting-api:8080
       TENANT_ID: ${GATEWAY_TENANT_ID:-00000000-0000-0000-0000-000000000001}
       UPSTREAM_TIMEOUT_MS: 10000
     depends_on:
@@ -135,6 +173,8 @@ services:
       identity-api:
         condition: service_started
       orders-api:
+        condition: service_started
+      reporting-api:
         condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9090/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -145,5 +185,6 @@ services:
 volumes:
   inventory_data:
   identity_data:
+  reporting_data:
   orders_data:
   rabbitmq_data:

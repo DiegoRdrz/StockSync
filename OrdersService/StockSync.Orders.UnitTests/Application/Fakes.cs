@@ -112,7 +112,7 @@ internal sealed class FakeInventoryClient : IInventoryClient
     private readonly Dictionary<(Guid ProductId, Guid BranchId), Guid> _assignments = new();
 
     public Dictionary<Guid, int> Balances { get; } = new();
-    public List<(string Kind, Guid StockId, int Quantity)> Movements { get; } = [];
+    public List<(string Kind, Guid StockId, int Quantity, Guid Id)> Movements { get; } = [];
 
     // Returns a result to replace the normal behavior of a movement, or null to apply it.
     public Func<string, Guid, StockMovementResult?> Override { get; set; } = (_, _) => null;
@@ -152,7 +152,8 @@ internal sealed class FakeInventoryClient : IInventoryClient
                 $"Insufficient stock. Available: {Balances[stockId]}; requested: {quantity}.");
 
         Balances[stockId] += kind == "Issue" ? -quantity : quantity;
-        Movements.Add((kind, stockId, quantity));
-        return StockMovementResult.Applied(Guid.NewGuid());
+        var movementId = Guid.NewGuid();
+        Movements.Add((kind, stockId, quantity, movementId));
+        return StockMovementResult.Applied(movementId);
     }
 }

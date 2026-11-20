@@ -9,7 +9,7 @@ namespace StockSync.Inventory.IntegrationTests;
 public abstract class PostgresTestBase : IAsyncLifetime
 {
     private readonly string _database = $"stocksync_test_{Guid.NewGuid():N}";
-    private string _connectionString = null!;
+    protected string ConnectionString { get; private set; } = null!;
 
     public async Task InitializeAsync()
     {
@@ -18,7 +18,7 @@ public abstract class PostgresTestBase : IAsyncLifetime
         await admin.OpenAsync();
         await using var command = new NpgsqlCommand($"CREATE DATABASE \"{_database}\"", admin);
         await command.ExecuteNonQueryAsync();
-        _connectionString = new NpgsqlConnectionStringBuilder(adminConnection) { Database = _database, Pooling = false }.ConnectionString;
+        ConnectionString = new NpgsqlConnectionStringBuilder(adminConnection) { Database = _database, Pooling = false }.ConnectionString;
 
         await using var context = CreateContext();
         await context.Database.MigrateAsync();
@@ -34,10 +34,10 @@ public abstract class PostgresTestBase : IAsyncLifetime
 
     protected InventoryDbContext CreateContext() => new(Options());
 
-    protected InventoryDbContext CreateContext(Guid tenantId) => new(Options(), new FixedTenant(tenantId));
+    protected InventoryDbContext CreateContext(Guid tenantId) => new(Options(), new TestTenant(tenantId));
 
     private DbContextOptions<InventoryDbContext> Options() =>
-        new DbContextOptionsBuilder<InventoryDbContext>().UseNpgsql(_connectionString).Options;
-
-    private sealed record FixedTenant(Guid TenantId) : ICurrentTenant;
+        new DbContextOptionsBuilder<InventoryDbContext>().UseNpgsql(ConnectionString).Options;
 }
+
+internal sealed record TestTenant(Guid TenantId) : ICurrentTenant;

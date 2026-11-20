@@ -14,7 +14,7 @@ public partial class StockServiceTests
 
     public StockServiceTests()
     {
-        _service = new StockService(_stockRepository, _productRepository, _movements, _unitOfWork);
+        _service = new StockService(_stockRepository, _productRepository, _movements, _outbox, _tenant, _unitOfWork);
     }
 
     private Product CreateProduct(string sku = "FER-001")
@@ -40,16 +40,18 @@ public partial class StockServiceTests
         var initialBalance = Assert.Single(_movements.Items);
         Assert.Equal(StockMovementType.Adjustment, initialBalance.Type);
         Assert.Equal((0, 20), (initialBalance.PreviousQuantity, initialBalance.NewQuantity));
+        AssertEvent(Assert.Single(_outbox.Events), initialBalance, product, branchId);
     }
 
     [Fact]
-    public async Task CreateAsync_ZeroInitialBalance_DoesNotRecordMovement()
+    public async Task CreateAsync_ZeroInitialBalance_DoesNotRecordMovementOrEvent()
     {
         var product = CreateProduct();
 
         await _service.CreateAsync(new StockRequest(product.Id, Guid.NewGuid(), 0), CancellationToken.None);
 
         Assert.Empty(_movements.Items);
+        Assert.Empty(_outbox.Events);
     }
 
     [Fact]
@@ -212,6 +214,20 @@ public partial class StockServiceTests
         var adjustment = _movements.Items.Last();
         Assert.Equal(StockMovementType.Adjustment, adjustment.Type);
         Assert.Equal((20, 3, 17), (adjustment.PreviousQuantity, adjustment.NewQuantity, adjustment.Quantity));
+        Assert.Equal(2, _outbox.Events.Count);
+        AssertEvent(_outbox.Events.Last(), adjustment, product, branchId);
+    }
+
+    [Fact]
+    public async Task UpdateQuantityAsync_Unchanged_DoesNotEnqueueAnotherEvent()
+    {
+        var product = CreateProduct();
+        var stock = await _service.CreateAsync(new(product.Id, Guid.NewGuid(), 5), default);
+
+        await _service.UpdateQuantityAsync(stock.Id, new(5), default);
+
+        Assert.Single(_movements.Items);
+        Assert.Single(_outbox.Events);
     }
 
     [Fact]

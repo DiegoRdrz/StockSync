@@ -4,6 +4,7 @@ using StockSync.Inventory.Application.Common.Exceptions;
 using StockSync.Inventory.Application.Movements;
 using StockSync.Inventory.Domain.Entities;
 using StockSync.Inventory.Infrastructure;
+using StockSync.Inventory.Infrastructure.Outbox;
 using StockSync.Inventory.Infrastructure.Repositories;
 
 namespace StockSync.Inventory.IntegrationTests;
@@ -66,7 +67,8 @@ public class MovementsPostgresTests : IAsyncLifetime
         hammer.Deactivate();
         await context.SaveChangesAsync();
         var service = new StockMovementService(new StockRepository(context), new ProductRepository(context),
-            new StockMovementRepository(context), new UnitOfWork(context));
+            new StockMovementRepository(context), new EfIntegrationEventOutbox(context),
+            new TestTenant(context.TenantId), new UnitOfWork(context));
 
         var page1 = await service.ListAllAsync(1, default);
         var page2 = await service.ListAllAsync(2, default);

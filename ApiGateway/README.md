@@ -1,10 +1,6 @@
 # StockSync API Gateway
 
-TypeScript + NestJS gateway using Fastify. It publishes the inventory service through one HTTP entry point without duplicating inventory rules or accessing PostgreSQL.
-
-```text
-Client / Swagger → gateway :9090 → InventoryService → PostgreSQL
-```
+TypeScript and NestJS gateway using Fastify. It serves as the HTTP entry point for Identity, Inventory, Orders and Reporting.
 
 ## Start with Docker
 
@@ -14,11 +10,11 @@ From the StockSync repository root:
 docker compose up -d --build
 ```
 
-Open http://localhost:9090/ to reach Swagger. The internal backend is `http://inventory-api:8080`; its direct development endpoint is http://localhost:5001. The gateway can start before inventory initialization finishes. `/health` checks the gateway process, not the backend or database.
+Open http://localhost:9090/ for Inventory Swagger. Reporting is available through `/api/reports` and directly on port 5004 for development. The gateway can start while backends initialize. `/health` checks the gateway process.
 
 ## Run locally
 
-Requires Node.js 24 or later. Start InventoryService first, then:
+Requires Node.js 24 or later. Start the backends for the routes you need, then:
 
 ```sh
 cd ApiGateway
@@ -28,7 +24,7 @@ npm ci
 npm run dev
 ```
 
-Use `INVENTORY_API_URL=http://localhost:5001` for inventory in Docker or `http://localhost:5041` for local .NET. Restart after changing `.env`. Use `npm run build` followed by `npm start` for compiled execution. Avoid running the local and Docker gateways on the same port; `docker compose stop api-gateway` stops the container.
+Use `INVENTORY_API_URL=http://localhost:5001` for inventory in Docker or `http://localhost:5041` for local .NET. Use `REPORTING_API_URL=http://localhost:5004` for Reporting in Docker or `http://localhost:5046` for local .NET. Restart after changing `.env`. Use `npm run build` followed by `npm start` for compiled execution. Avoid running the local and Docker gateways on the same port; `docker compose stop api-gateway` stops the container.
 
 ## Routes and behavior
 
@@ -45,13 +41,12 @@ Use `INVENTORY_API_URL=http://localhost:5001` for inventory in Docker or `http:/
 | `/api/inventory/movements` and subpaths | General movement listing |
 | `/api/orders` and subpaths | Sales orders on OrdersService (same path upstream) |
 | `/api/purchase-orders` and subpaths | Purchase orders on OrdersService (same path upstream) |
+| `/api/reports` and subpaths | Sales, purchases and inventory reports on ReportingService (same path upstream) |
 | `/swagger` and subpaths | Swagger UI and OpenAPI JSON |
 
-The gateway proxies requests to `IdentityService`, `InventoryService`, and `OrdersService`:
-- `/api/auth/...`, `/api/users/...`, `/api/tenants/...` reach `IdentityService`.
-- `/api/inventory/...` is rewritten to `/api/...` and reaches `InventoryService`.
-- `/api/orders/...` and `/api/purchase-orders/...` keep their path and reach `OrdersService`.
-- **Dynamic Multi-Tenancy**: When a request carries `Authorization: Bearer <token>`, the gateway automatically decodes the JWT and injects the user's `X-Tenant-Id` header to `InventoryService`. Unauthenticated requests fall back to the development `TENANT_ID`.
+The Inventory prefix `/api/inventory` is rewritten to `/api`. Identity, Orders and Reporting paths are preserved.
+
+The gateway overwrites the caller's `X-Tenant-Id`. Orders always uses the configured development `TENANT_ID`. Inventory and Reporting use the bearer JWT's `tenant_id` or `TenantId` claim and fall back to `TENANT_ID` when no usable claim is present. The gateway does not verify the JWT signature.
 
 ```sh
 curl http://localhost:9090/api/inventory/products
@@ -73,14 +68,14 @@ Other documentation is preserved. Documents are limited to 2 MiB; invalid docume
 | `HOST` | `127.0.0.1` |
 | `PORT` | `9090` |
 | `INVENTORY_API_URL` | `http://localhost:5001` |
+| `IDENTITY_API_URL` | `http://localhost:5002` |
 | `ORDERS_API_URL` | `http://localhost:5003` |
+| `REPORTING_API_URL` | `http://localhost:5004` |
 | `UPSTREAM_TIMEOUT_MS` | `10000` |
 | `TENANT_ID` | `00000000-0000-0000-0000-000000000001` |
 | `INVENTORY_CA_FILE` | Optional PEM file for an HTTPS backend |
 
 Docker uses `GATEWAY_PORT` and `GATEWAY_TENANT_ID` from the root `.env`. Recreate containers after configuration changes with `docker compose up -d`.
-
-The gateway uses a fixed development tenant and overwrites `X-Tenant-Id`. It does not authenticate users or resolve tenants per user. For production multitenancy, add authentication and authorized tenant resolution and restrict direct backend access.
 
 ### Optional HTTPS
 

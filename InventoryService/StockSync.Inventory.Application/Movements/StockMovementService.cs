@@ -1,5 +1,6 @@
 using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Application.Common.Exceptions;
+using StockSync.Inventory.Application.IntegrationEvents;
 using StockSync.Inventory.Domain.Entities;
 using StockSync.Inventory.Domain.Repositories;
 
@@ -10,14 +11,19 @@ public class StockMovementService : IStockMovementService
     private readonly IStockRepository _stockRepository;
     private readonly IProductRepository _productRepository;
     private readonly IStockMovementRepository _movementRepository;
+    private readonly IIntegrationEventOutbox _outbox;
+    private readonly ICurrentTenant _currentTenant;
     private readonly IUnitOfWork _unitOfWork;
 
     public StockMovementService(IStockRepository stockRepository, IProductRepository productRepository,
-        IStockMovementRepository movementRepository, IUnitOfWork unitOfWork)
+        IStockMovementRepository movementRepository, IIntegrationEventOutbox outbox,
+        ICurrentTenant currentTenant, IUnitOfWork unitOfWork)
     {
         _stockRepository = stockRepository;
         _productRepository = productRepository;
         _movementRepository = movementRepository;
+        _outbox = outbox;
+        _currentTenant = currentTenant;
         _unitOfWork = unitOfWork;
     }
 
@@ -39,14 +45,14 @@ public class StockMovementService : IStockMovementService
             var stock = await _stockRepository.GetForUpdateAsync(stockId, cancellationToken)
                 ?? throw StockNotFound(stockId);
 
-            if (await _productRepository.GetByIdAsync(stock.ProductId, cancellationToken) is null)
-                throw new ConflictException($"Product '{stock.ProductId}' is inactive; its stock cannot record movements.");
+            var product = await _productRepository.GetByIdAsync(stock.ProductId, cancellationToken)
+                ?? throw new ConflictException($"Product '{stock.ProductId}' is inactive; its stock cannot record movements.");
 
             var movement = stock.RecordMovement(type, request.Quantity);
             await _movementRepository.AddAsync(movement, cancellationToken);
 
-            // Both repositories share the request DbContext. A single SaveChanges
-            // commits the balance and its history; any conflict rolls back both.
+            // The shared DbContext commits the balance, movement and event together.
+            _outbox.Enqueue(StockMovementRecorded.From(movement, stock, product, _currentTenant.TenantId));
             await _stockRepository.SaveChangesAsync(cancellationToken);
             return StockMovementResponse.From(movement);
         }, cancellationToken);

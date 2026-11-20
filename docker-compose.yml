@@ -94,7 +94,8 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      # Run diagnostics as the broker user so a startup probe cannot create a root-owned cookie.
+      test: ["CMD", "su-exec", "rabbitmq", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -163,6 +164,7 @@ services:
       INVENTORY_API_URL: http://inventory-api:8080
       IDENTITY_API_URL: http://identity-api:8080
       ORDERS_API_URL: http://orders-api:8080
+      REPORTING_API_URL: http://reporting-api:8080
       TENANT_ID: ${GATEWAY_TENANT_ID:-00000000-0000-0000-0000-000000000001}
       UPSTREAM_TIMEOUT_MS: 10000
     depends_on:
@@ -171,6 +173,8 @@ services:
       identity-api:
         condition: service_started
       orders-api:
+        condition: service_started
+      reporting-api:
         condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9090/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]

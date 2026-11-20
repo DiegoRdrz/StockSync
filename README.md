@@ -1,6 +1,6 @@
 # StockSync
 
-Multi-tenant SaaS inventory, orders, and identity platform built with microservices using **.NET 8**, **TypeScript/NestJS**, **PostgreSQL 15**, and **RabbitMQ**.
+Multi-tenant SaaS inventory, orders, identity, and reporting platform built with microservices using **.NET 8**, **TypeScript/NestJS**, **PostgreSQL 15**, and **RabbitMQ**.
 
 ## Available Services
 
@@ -10,12 +10,15 @@ Multi-tenant SaaS inventory, orders, and identity platform built with microservi
 | **Inventory Service** | `5001` | <http://localhost:5001/swagger> | .NET 8 (English) |
 | **Identity Service** | `5002` | <http://localhost:5002/swagger> | .NET 8 (English) |
 | **Orders Service** | `5003` | <http://localhost:5003/swagger> | .NET 8 (English) |
+| **Reporting Service** | `5004` | <http://localhost:5004/swagger> | .NET 8 |
 
 For dedicated service documentation:
-- [Inventory Service Documentation](file:///InventoryService/README.md)
-- [Identity Service Documentation](file:///IdentityService/README.md)
-- [Orders Service Documentation](file:///OrdersService/README.md)
-- [API Gateway Documentation](file:///ApiGateway/README.md)
+
+- [Inventory Service Documentation](#inventory-rules)
+- [Identity Service Documentation](IdentityService/README.md)
+- [Orders Service Documentation](#orders-service)
+- [Reporting Service Documentation](ReportingService/README.md)
+- [API Gateway Documentation](ApiGateway/README.md)
 
 ## Run with Docker
 
@@ -26,9 +29,9 @@ cp -n .env.example .env
 docker compose up -d --build
 ```
 
-Open **http://localhost:9090/swagger**. The gateway forwards requests to `http://inventory-api:8080`. The inventory API remains directly accessible at http://localhost:5001 for development.
+Open **http://localhost:9090/swagger** for Inventory Swagger. Query Reporting under `/api/reports` on port 9090 or open its Swagger on port 5004. PostgreSQL uses host ports 5432 (Inventory), 5433 (Identity), 5434 (Orders) and 5435 (Reporting). RabbitMQ uses port 5672 for AMQP and 15672 for its management UI.
 
-The API waits for PostgreSQL, applies pending migrations, and loads demo data before serving requests. Repeated startup does not reset stock balances. Configure `POSTGRES_PASSWORD`, `LOAD_DEMO_DATA`, `GATEWAY_PORT` and `GATEWAY_TENANT_ID` in the root `.env`.
+Each API waits for its PostgreSQL database and applies pending migrations. Inventory and Identity load demo data when enabled. Repeated startup does not reset stock balances. Configure `POSTGRES_PASSWORD`, `LOAD_DEMO_DATA`, `GATEWAY_PORT` and `GATEWAY_TENANT_ID` in the root `.env`.
 
 ```sh
 docker compose logs -f inventory-api  # Ctrl+C exits the log viewer.
@@ -42,7 +45,7 @@ The image enables `Initialization__ApplyMigrations=true`. With multiple API repl
 
 ![Project architecture](Assets/Diagram.png)
 
-The diagram includes planned services; this repository currently implements inventory, orders and the gateway. See [Orders service](#orders-service).
+ReportingService is implemented. Notification remains planned.
 
 ## Run locally
 
@@ -81,7 +84,7 @@ See [the gateway README](ApiGateway/README.md) for running the gateway with Node
 
 ## Public routes
 
-The gateway maps `/api/inventory/...` to `/api/...` on the inventory service.
+The gateway maps `/api/inventory/...` to `/api/...` on Inventory and preserves Orders and Reporting paths.
 
 | Gateway route | Purpose |
 | --- | --- |
@@ -96,6 +99,11 @@ The gateway maps `/api/inventory/...` to `/api/...` on the inventory service.
 | `/api/inventory/stock/{stockId}/movements` | Stock movement history |
 | `/api/inventory/movements` | Latest 10 movements across all stocks |
 | `/api/inventory/movements/page/{page}` | Subsequent pages of 10 movements |
+| `/api/orders`, `/api/purchase-orders` | Sales and purchase order workflows |
+| `/api/reports/sales` and subpaths | Sales summary, daily totals, top products and paginated sales |
+| `/api/reports/purchases/summary`, `/api/reports/purchases/daily` | Received purchase totals |
+| `/api/reports/inventory/movements/summary` | Movement totals by type, UTC day and product |
+| `/api/reports/inventory/low-stock` | Latest known balances below minimum, paginated |
 
 Product requests use `name`, `sku`, `description`, `purchasePrice`, `salePrice`, `minimumStock` and `categoryId`. Stock creation uses `productId`, `branchId` and `quantity`; a manual update uses `newQuantity`. Receipt and issue requests use `quantity`.
 
@@ -147,7 +155,7 @@ The [HTTP examples](InventoryService/StockSync.Inventory.WebApi/StockSync.Invent
 
 Categories, products, stock and movements belong to a tenant identified by the `X-Tenant-Id` GUID header. Tenants cannot read or reference each other's records. The direct API requires the header unless `Multitenancy:RequireHeader` is false, as configured in Development. When optional, omission uses `00000000-0000-0000-0000-000000000001`.
 
-The gateway currently uses a fixed development tenant and replaces client-supplied tenant headers. It does not implement user authentication or per-user tenant resolution. A production gateway must authenticate users, resolve their authorized tenant, and restrict direct access to the backend.
+The gateway overwrites the caller's `X-Tenant-Id`. Orders always uses the configured development `TENANT_ID`. Inventory and Reporting use the bearer JWT's `tenant_id` or `TenantId` claim and fall back to `TENANT_ID` when no usable claim is present. The gateway does not verify the JWT signature.
 
 ## English migration
 
@@ -184,11 +192,11 @@ Inventory has no batch or idempotent movement endpoint, so confirmation is an or
 
 Receiving a purchase order uses the same saga with receipts, compensated with issues. Calls go directly to `http://inventory-api:8080` with the caller's `X-Tenant-Id`; the request is not cancelled halfway even if the client disconnects.
 
-### Integration events
+## Reporting service
 
-`OrderCreated` and `SaleConfirmed` are written to `OutboxMessages` in the same transaction as the order change (transactional outbox) and published by a background worker to the durable topic exchange `stocksync.events` with routing keys `orders.order-created.v1` and `orders.sale-confirmed.v1`. Each message has the event ID as `message_id`, the event type as `type` and a `tenant-id` header; the JSON body uses camelCase. Delivery is at least once, so consumers must deduplicate by event ID and declare their own queues. `SaleConfirmed` is informational: Inventory has already issued the stock, so consuming it to decrement stock again would double the decrement. Without `RabbitMq:ConnectionString`, events stay in the outbox.
+ReportingService projects confirmed sales, received purchase orders and inventory movements into its own PostgreSQL database, `stocksync_reporting`. Orders and Inventory commit events through their transactional outboxes and publish to RabbitMQ's `stocksync.events` exchange. Reporting uses separate durable queues for sales, purchases and stock movements. Delivery is at least once and Reporting deduplicates by event ID. Report data becomes visible after the outbox publisher and consumer finish processing it.
 
-See the [integration event contracts and development replay instructions](docs/integration-events.md).
+Orders also publishes `orders.order-created.v1` for draft sales. Sales and purchases provide commercial totals. Inventory movements drive inventory reporting, including saga compensation movements. See [integration event contracts and development replay](docs/integration-events.md) and the [ReportingService runbook](ReportingService/README.md).
 
 ## Inventory service checks
 
@@ -202,4 +210,4 @@ STOCKSYNC_TEST_POSTGRES='Host=localhost;Database=postgres;Username=postgres;Pass
   dotnet test StockSync.Inventory.sln
 ```
 
-Run the same commands from `OrdersService` with `StockSync.Orders.sln` for the orders service. Without that variable, PostgreSQL integration checks are skipped. Each integration check creates and removes its own database rather than changing application data. The gateway has no test directory; use `npm run typecheck` and `npm run build` to check it.
+Run the same commands from `OrdersService` or `ReportingService` with the corresponding solution. Without that variable, PostgreSQL integration checks are skipped. Each integration check creates and removes its own database rather than changing application data. The gateway has no test directory; use `npm run typecheck` and `npm run build` to check it.

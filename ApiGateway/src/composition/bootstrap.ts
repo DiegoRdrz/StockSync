@@ -21,8 +21,12 @@ export async function createGateway(options: GatewayOptions): Promise<NestFastif
     forceCloseConnections: true,
     routerOptions: { caseSensitive: false },
   });
+  server.decorateRequest('verifiedTenant', null);
   server.addHook('onRequest', async (request, reply) => {
     reply.header('x-request-id', request.id);
+    if (request.method === 'OPTIONS' && request.headers.origin && request.headers['access-control-request-method']) {
+      return reply.code(204).send();
+    }
   });
   server.addHook('onResponse', async (request, reply) => {
     request.log.info({

@@ -1,45 +1,46 @@
+import { authorizeProxy } from '../../application/routing/auth-policy.js';
+import { AccessTokenVerifier } from '../auth/access-token-verifier.service.js';
 import { reportingRoutes } from '../../application/routing/reporting-routes.js';
 import { Injectable } from '@nestjs/common';
 import type { FastifyInstance } from 'fastify';
 import httpProxy, { type FastifyHttpProxyOptions } from '@fastify/http-proxy';
-import { cleanHeaders, extractTenantFromAuthorization, prepareRequestHeaders, toPublicLocation } from './proxy-headers.js';
+import { cleanHeaders, prepareRequestHeaders, toPublicLocation } from './proxy-headers.js';
 import { GatewayConfigService } from '../configuration/gateway-config.service.js';
 
 @Injectable()
 export class ReportingProxyService {
-  constructor(private readonly config: GatewayConfigService) {}
+  constructor(private readonly config: GatewayConfigService, private readonly auth: AccessTokenVerifier) {}
 
   registerRoutes(app: FastifyInstance): void {
     const target = new URL(this.config.options.reportingUpstream);
-    const { timeoutMs, tenantId } = this.config.options;
+    const { timeoutMs } = this.config.options;
     for (const { prefix, rewritePrefix } of reportingRoutes) {
       app.register(httpProxy, {
         upstream: target.origin,
         prefix,
         rewritePrefix,
+        preHandler: authorizeProxy('reporting', header => this.auth.verify(header)),
         proxyPayloads: true,
         undici: { connectTimeout: timeoutMs, headersTimeout: timeoutMs, bodyTimeout: timeoutMs },
         disableRequestLogging: true,
         retryMethods: [],
         maxRetriesOn503: 0,
         internalRewriteLocationHeader: false,
-        replyOptions: createReplyOptions(target, tenantId),
+        replyOptions: createReplyOptions(target),
       });
     }
   }
 }
 
-function createReplyOptions(target: URL, tenantId: string): FastifyHttpProxyOptions['replyOptions'] {
+function createReplyOptions(target: URL): FastifyHttpProxyOptions['replyOptions'] {
   return {
     rewriteRequestHeaders(request, original) {
-      const authHeader = original.authorization ? String(original.authorization) : undefined;
       return {
-        ...prepareRequestHeaders(original, false),
+        ...prepareRequestHeaders(original, request.verifiedTenant, false, false),
         'x-request-id': request.id,
         'x-forwarded-for': request.ip,
         'x-forwarded-proto': request.protocol,
         'x-forwarded-host': request.host,
-        'x-tenant-id': extractTenantFromAuthorization(authHeader) || tenantId,
       };
     },
     rewriteHeaders(original, request) {

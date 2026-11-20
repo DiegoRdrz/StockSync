@@ -19,7 +19,7 @@ export class AccessTokenVerifier {
     this.key = new TextEncoder().encode(jwtSecret);
   }
 
-  async verify(header: string | undefined): Promise<string> {
+  async verify(header: string | undefined): Promise<{ tenant: string; subject: string; owner: boolean }> {
     const match = /^Bearer ([^\s,]+)$/i.exec(header ?? '');
     if (!match) throw new Error('Invalid bearer credential.');
     const { jwtIssuer: issuer, jwtAudience: audience } = this.config.options;
@@ -27,6 +27,6 @@ export class AccessTokenVerifier {
       algorithms: ['HS256'], issuer, audience, clockTolerance: 0, requiredClaims: ['exp', 'sub', 'tenant_id'],
     });
     if (!isIdentity(payload.sub) || !isIdentity(payload.tenant_id)) throw new Error('Invalid identity.');
-    return payload.tenant_id.toLowerCase();
+    return { tenant: payload.tenant_id.toLowerCase(), subject: payload.sub.toLowerCase(), owner: payload.role === 'Owner' };
   }
 }

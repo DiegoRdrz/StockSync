@@ -15,7 +15,8 @@ const sign = (payload, alg = 'HS256', signingKey = key) =>
   new SignJWT(payload).setProtectedHeader({ alg }).sign(signingKey);
 
 test('accepts an Identity-compatible access token', async () => {
-  assert.equal(await verifier.verify('Bearer ' + await sign(claims)), claims.tenant_id);
+  assert.deepEqual(await verifier.verify('Bearer ' + await sign(claims)),
+    { tenant: claims.tenant_id, subject: claims.sub, owner: false });
 });
 for (const [name, changes] of Object.entries({
   expired: { exp: now - 1 }, premature: { nbf: now + 120 }, issuer: { iss: 'other' }, audience: { aud: 'other' },

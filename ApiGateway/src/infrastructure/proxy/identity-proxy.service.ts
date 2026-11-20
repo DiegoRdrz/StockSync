@@ -1,3 +1,5 @@
+import { authorizeProxy } from '../../application/routing/auth-policy.js';
+import { AccessTokenVerifier } from '../auth/access-token-verifier.service.js';
 import { identityRoutes } from '../../application/routing/identity-routes.js';
 import { Injectable } from '@nestjs/common';
 import type { FastifyInstance } from 'fastify';
@@ -7,7 +9,7 @@ import { GatewayConfigService } from '../configuration/gateway-config.service.js
 
 @Injectable()
 export class IdentityProxyService {
-  constructor(private readonly config: GatewayConfigService) {}
+  constructor(private readonly config: GatewayConfigService, private readonly auth: AccessTokenVerifier) {}
 
   registerRoutes(app: FastifyInstance): void {
     const target = new URL(this.config.options.identityUpstream);
@@ -18,6 +20,7 @@ export class IdentityProxyService {
         upstream: target.origin,
         prefix,
         rewritePrefix,
+        preHandler: authorizeProxy('identity', header => this.auth.verify(header)),
         proxyPayloads: true,
         undici: {
           connectTimeout: timeoutMs,
@@ -42,7 +45,7 @@ function createReplyOptions(target: URL): FastifyHttpProxyOptions['replyOptions'
     },
     rewriteRequestHeaders(request, original) {
       return {
-        ...prepareRequestHeaders(original, false),
+        ...prepareRequestHeaders(original, request.verifiedTenant, true, false),
         'x-request-id': request.id,
         'x-forwarded-for': request.ip,
         'x-forwarded-proto': request.protocol,
@@ -75,4 +78,3 @@ function upstreamProblem(error: Error & { statusCode?: number; cause?: unknown }
       : 'Unable to connect to the identity service',
   };
 }
-

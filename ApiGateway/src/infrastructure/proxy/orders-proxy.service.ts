@@ -1,3 +1,5 @@
+import { authorizeProxy } from '../../application/routing/auth-policy.js';
+import { AccessTokenVerifier } from '../auth/access-token-verifier.service.js';
 import { ordersRoutes } from '../../application/routing/orders-routes.js';
 import { Injectable } from '@nestjs/common';
 import type { FastifyInstance } from 'fastify';
@@ -7,7 +9,7 @@ import { GatewayConfigService } from '../configuration/gateway-config.service.js
 
 @Injectable()
 export class OrdersProxyService {
-  constructor(private readonly config: GatewayConfigService) {}
+  constructor(private readonly config: GatewayConfigService, private readonly auth: AccessTokenVerifier) {}
 
   registerRoutes(app: FastifyInstance): void {
     const target = new URL(this.config.options.ordersUpstream);
@@ -17,6 +19,7 @@ export class OrdersProxyService {
         upstream: target.origin,
         prefix,
         rewritePrefix,
+        preHandler: authorizeProxy('orders', header => this.auth.verify(header), tenantId),
         proxyPayloads: true,
         undici: { connectTimeout: timeoutMs, headersTimeout: timeoutMs, bodyTimeout: timeoutMs },
         disableRequestLogging: true,
@@ -24,22 +27,21 @@ export class OrdersProxyService {
         retryMethods: [],
         maxRetriesOn503: 0,
         internalRewriteLocationHeader: false,
-        replyOptions: createReplyOptions(target, tenantId),
+        replyOptions: createReplyOptions(target),
       });
     }
   }
 }
 
-function createReplyOptions(target: URL, tenantId: string): FastifyHttpProxyOptions['replyOptions'] {
+function createReplyOptions(target: URL): FastifyHttpProxyOptions['replyOptions'] {
   return {
     rewriteRequestHeaders(request, original) {
       return {
-        ...prepareRequestHeaders(original, false),
+        ...prepareRequestHeaders(original, request.verifiedTenant, false, false),
         'x-request-id': request.id,
         'x-forwarded-for': request.ip,
         'x-forwarded-proto': request.protocol,
         'x-forwarded-host': request.host,
-        'x-tenant-id': tenantId,
       };
     },
     rewriteHeaders(original, request) {

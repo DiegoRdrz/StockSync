@@ -32,6 +32,10 @@ export function publishInventoryOpenApi(input: unknown): Record<string, unknown>
   const document = structuredClone(input);
   if (typeof document.openapi !== 'string') return document;
 
+  const components = isRecord(document.components) ? document.components : {};
+  const schemes = isRecord(components.securitySchemes) ? components.securitySchemes : {};
+  document.components = { ...components, securitySchemes: { ...schemes, bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } } };
+  document.security = [{ bearerAuth: [] }];
   document.servers = [{ url: '/' }];
   if (document.paths !== undefined && !isRecord(document.paths)) {
     throw new Error('Invalid OpenAPI paths');

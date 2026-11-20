@@ -1,12 +1,11 @@
 services:
   inventory-db:
+    networks: [inventory-data]
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stock1234}
       POSTGRES_DB: stocksync_inventory
-    ports:
-      - "5432:5432"
     volumes:
       - inventory_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,16 +15,16 @@ services:
       retries: 10
 
   inventory-api:
+    networks: [gateway-inventory, inventory-data, inventory-events, orders-inventory]
     build:
       context: ./InventoryService
       dockerfile: StockSync.Inventory.WebApi/Dockerfile
-    ports:
-      - "5001:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - Multitenancy__RequireHeader=true
       - ConnectionStrings__DefaultConnection=Host=inventory-db;Database=stocksync_inventory;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
       - Initialization__ApplyMigrations=true
-      - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-true}
+      - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-false}
       - RabbitMq__ConnectionString=amqp://${RABBITMQ_USER:-stocksync}:${RABBITMQ_PASSWORD:-stocksync}@rabbitmq:5672
     depends_on:
       inventory-db:
@@ -34,13 +33,12 @@ services:
         condition: service_healthy
 
   identity-db:
+    networks: [identity-data]
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stock1234}
       POSTGRES_DB: stocksync_identity
-    ports:
-      - "5433:5432"
     volumes:
       - identity_data:/var/lib/postgresql/data
     healthcheck:
@@ -50,31 +48,29 @@ services:
       retries: 10
 
   identity-api:
+    networks: [gateway-identity, identity-data]
     build:
       context: ./IdentityService
       dockerfile: StockSync.Identity.WebApi/Dockerfile
-    ports:
-      - "5002:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ConnectionStrings__DefaultConnection=Host=identity-db;Database=stocksync_identity;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
       - Initialization__ApplyMigrations=true
-      - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-true}
-      - Jwt__Issuer=StockSync.Identity
-      - Jwt__Audience=StockSync.Ecosystem
-      - Jwt__SecretKey=${JWT_SECRET_KEY:-StockSyncSuperSecretSecureKey123456789!NeverShareInProduction!}
+      - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-false}
+      - Jwt__Issuer=${JWT_ISSUER:-StockSync.Identity}
+      - Jwt__Audience=${JWT_AUDIENCE:-StockSync.Ecosystem}
+      - Jwt__SecretKey=${JWT_SECRET_KEY:?Set JWT_SECRET_KEY}
     depends_on:
       identity-db:
         condition: service_healthy
 
   orders-db:
+    networks: [orders-data]
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stock1234}
       POSTGRES_DB: stocksync_orders
-    ports:
-      - "5434:5432"
     volumes:
       - orders_data:/var/lib/postgresql/data
     healthcheck:
@@ -84,13 +80,11 @@ services:
       retries: 10
 
   rabbitmq:
+    networks: [inventory-events, orders-events, reporting-events]
     image: rabbitmq:3.13-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-stocksync}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-stocksync}
-    ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -101,13 +95,13 @@ services:
       retries: 10
 
   orders-api:
+    networks: [gateway-orders, orders-data, orders-events, orders-inventory]
     build:
       context: ./OrdersService
       dockerfile: StockSync.Orders.WebApi/Dockerfile
-    ports:
-      - "5003:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - Multitenancy__RequireHeader=true
       - ConnectionStrings__DefaultConnection=Host=orders-db;Database=stocksync_orders;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
       - Initialization__ApplyMigrations=true
       - Inventory__BaseUrl=http://inventory-api:8080
@@ -121,13 +115,12 @@ services:
         condition: service_started
 
   reporting-db:
+    networks: [reporting-data]
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stock1234}
       POSTGRES_DB: stocksync_reporting
-    ports:
-      - "5435:5432"
     volumes:
       - reporting_data:/var/lib/postgresql/data
     healthcheck:
@@ -137,13 +130,12 @@ services:
       retries: 10
 
   reporting-api:
+    networks: [gateway-reporting, reporting-data, reporting-events]
     build:
       context: ./ReportingService
       dockerfile: StockSync.Reporting.WebApi/Dockerfile
-    ports:
-      - "5004:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ConnectionStrings__DefaultConnection=Host=reporting-db;Database=stocksync_reporting;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
       - Initialization__ApplyMigrations=true
       - RabbitMq__ConnectionString=amqp://${RABBITMQ_USER:-stocksync}:${RABBITMQ_PASSWORD:-stocksync}@rabbitmq:5672
@@ -154,6 +146,7 @@ services:
         condition: service_healthy
 
   api-gateway:
+    networks: [edge, gateway-identity, gateway-inventory, gateway-orders, gateway-reporting]
     build:
       context: ./ApiGateway
     ports:
@@ -165,6 +158,9 @@ services:
       IDENTITY_API_URL: http://identity-api:8080
       ORDERS_API_URL: http://orders-api:8080
       REPORTING_API_URL: http://reporting-api:8080
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY}
+      JWT_ISSUER: ${JWT_ISSUER:-StockSync.Identity}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-StockSync.Ecosystem}
       TENANT_ID: ${GATEWAY_TENANT_ID:-00000000-0000-0000-0000-000000000001}
       UPSTREAM_TIMEOUT_MS: 10000
     depends_on:
@@ -181,6 +177,33 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+networks:
+  edge: {}
+  gateway-identity:
+    internal: true
+  gateway-inventory:
+    internal: true
+  gateway-orders:
+    internal: true
+  gateway-reporting:
+    internal: true
+  inventory-events:
+    internal: true
+  orders-events:
+    internal: true
+  reporting-events:
+    internal: true
+  identity-data:
+    internal: true
+  inventory-data:
+    internal: true
+  orders-inventory:
+    internal: true
+  orders-data:
+    internal: true
+  reporting-data:
+    internal: true
 
 volumes:
   inventory_data:

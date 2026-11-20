@@ -4,13 +4,13 @@ Multi-tenant SaaS inventory, orders, identity, and reporting platform built with
 
 ## Available Services
 
-| Service | Docker Port | Swagger UI | Language |
-|---|---|---|---|
-| **API Gateway** | `9090` | <http://localhost:9090/swagger> | TypeScript / NestJS |
-| **Inventory Service** | `5001` | <http://localhost:5001/swagger> | .NET 8 (English) |
-| **Identity Service** | `5002` | <http://localhost:5002/swagger> | .NET 8 (English) |
-| **Orders Service** | `5003` | <http://localhost:5003/swagger> | .NET 8 (English) |
-| **Reporting Service** | `5004` | <http://localhost:5004/swagger> | .NET 8 |
+| Service | Compose access | Local HTTP port |
+| --- | --- | --- |
+| API Gateway (NestJS) | localhost:9090 | 9090 |
+| Inventory (.NET 8) | Internal, via `/api/inventory` | 5041 |
+| Identity (.NET 8) | Internal, via `/api/auth`, `/api/users` and `/api/tenants` | 5042 |
+| Orders (.NET 8) | Internal, via `/api/orders` and `/api/purchase-orders` | 5045 |
+| Reporting (.NET 8) | Internal, via `/api/reports` | 5046 |
 
 For dedicated service documentation:
 
@@ -22,14 +22,16 @@ For dedicated service documentation:
 
 ## Run with Docker
 
-Start Docker Desktop, then run from the repository root:
+Provision a random `JWT_SECRET_KEY` of at least 32 UTF-8 bytes in the environment or ignored root `.env`. Compose supplies this key to Identity and the gateway. For a new local Bash session use `export JWT_SECRET_KEY="$(openssl rand -hex 48)"`. Keep the same key across starts. Use private database and broker credentials in shared deployments.
+
+Start Docker Desktop and run from the repository root:
 
 ```sh
 cp -n .env.example .env
 docker compose up -d --build
 ```
 
-Open **http://localhost:9090/swagger** for Inventory Swagger. Query Reporting under `/api/reports` on port 9090 or open its Swagger on port 5004. PostgreSQL uses host ports 5432 (Inventory), 5433 (Identity), 5434 (Orders) and 5435 (Reporting). RabbitMQ uses port 5672 for AMQP and 15672 for its management UI.
+Open **http://localhost:9090/swagger** for Inventory Swagger. Use Authorize with an Identity access token for business operations. The default stack publishes only the gateway on loopback. For local database and broker tools add `-f docker-compose.yml -f docker-compose.dev.yml` to Compose commands. The override publishes PostgreSQL ports 5432–5435, AMQP port 5672 and management port 15672 on loopback.
 
 Each API waits for its PostgreSQL database and applies pending migrations. Inventory and Identity load demo data when enabled. Repeated startup does not reset stock balances. Configure `POSTGRES_PASSWORD`, `LOAD_DEMO_DATA`, `GATEWAY_PORT` and `GATEWAY_TENANT_ID` in the root `.env`.
 
@@ -52,7 +54,7 @@ ReportingService is implemented. Notification remains planned.
 Install an SDK with the .NET 8 runtime and start PostgreSQL on `localhost:5432`:
 
 ```sh
-docker compose up -d inventory-db
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d inventory-db
 cd InventoryService
 dotnet tool restore
 dotnet restore
@@ -64,7 +66,7 @@ dotnet run --project StockSync.Inventory.WebApi --launch-profile http -- --seed
 dotnet run --project StockSync.Inventory.WebApi --launch-profile http
 ```
 
-Local Swagger is at http://localhost:5041/swagger. Docker exposes the direct API at port `5001` instead. Local migrations and seeding are explicit commands; ordinary `dotnet run` does not perform them automatically. Connection strings are configured through `ConnectionStrings__DefaultConnection` or development appsettings.
+Local Swagger is at http://localhost:5041/swagger. Local API listeners assume a trusted development host. Local migrations and seeding are explicit commands; ordinary `dotnet run` does not perform them automatically. Connection strings are configured through `ConnectionStrings__DefaultConnection` or development appsettings.
 
 ### Inventory movement events
 
@@ -82,7 +84,7 @@ dotnet --list-runtimes
 
 See [the gateway README](ApiGateway/README.md) for running the gateway with Node.js 24.
 
-## Public routes
+## Authenticated business routes
 
 The gateway maps `/api/inventory/...` to `/api/...` on Inventory and preserves Orders and Reporting paths.
 
@@ -124,14 +126,14 @@ The general movement list is ordered by descending date and ID. Each item contai
 The first two assignments use branch `11111111-1111-1111-1111-111111111111`; the third uses `22222222-2222-2222-2222-222222222222`. Branches belong to another service and are not modeled as inventory tables. SKU identifiers remain stable across the language migration.
 
 ```sh
-curl http://localhost:9090/api/inventory/products
-curl http://localhost:9090/api/inventory/categories
-curl http://localhost:9090/api/inventory/stock/branch/11111111-1111-1111-1111-111111111111
+curl -H "Authorization: Bearer ${ACCESS_TOKEN}" http://localhost:9090/api/inventory/products
+curl -H "Authorization: Bearer ${ACCESS_TOKEN}" http://localhost:9090/api/inventory/categories
+curl -H "Authorization: Bearer ${ACCESS_TOKEN}" http://localhost:9090/api/inventory/stock/branch/11111111-1111-1111-1111-111111111111
 
 # Replace with an actual stock ID.
 stock_id='STOCK_ID'
-curl "http://localhost:9090/api/inventory/stock/$stock_id/movements"
-curl -i -X POST "http://localhost:9090/api/inventory/stock/$stock_id/issues" \
+curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "http://localhost:9090/api/inventory/stock/$stock_id/movements"
+curl -H "Authorization: Bearer ${ACCESS_TOKEN}" -i -X POST "http://localhost:9090/api/inventory/stock/$stock_id/issues" \
   -H 'Content-Type: application/json' -d '{"quantity":1}'
 ```
 
@@ -155,7 +157,11 @@ The [HTTP examples](InventoryService/StockSync.Inventory.WebApi/StockSync.Invent
 
 Categories, products, stock and movements belong to a tenant identified by the `X-Tenant-Id` GUID header. Tenants cannot read or reference each other's records. The direct API requires the header unless `Multitenancy:RequireHeader` is false, as configured in Development. When optional, omission uses `00000000-0000-0000-0000-000000000001`.
 
-The gateway overwrites the caller's `X-Tenant-Id`. Orders always uses the configured development `TENANT_ID`. Inventory and Reporting use the bearer JWT's `tenant_id` or `TenantId` claim and fall back to `TENANT_ID` when no usable claim is present. The gateway does not verify the JWT signature.
+The gateway verifies the HS256 access token and replaces any caller-supplied `X-Tenant-Id` with the verified `tenant_id`. Missing or invalid credentials return 401. Orders also requires this tenant to match `TENANT_ID` and returns 403 for a different tenant. Inventory and Reporting use the verified tenant for each request.
+
+On a fresh database, register a tenant with `POST /api/auth/register-tenant`. Login and registration return `accessToken` and the tenant ID. Set `GATEWAY_TENANT_ID` to the intended Orders tenant ID and recreate the gateway when enabling Orders for that tenant. Use the token as `Authorization: Bearer <accessToken>` for protected requests.
+
+During upgrades, replace any previously distributed development signing key and rotate or deactivate existing demo credentials. Demo seeding is opt-in and disabling it affects future initialization. Key rotation requires users to log in again. Terminate HTTPS at a trusted edge before offering the gateway beyond localhost.
 
 ## English migration
 
@@ -167,7 +173,7 @@ Historical migrations and their old database names are intentionally retained so
 
 ## Orders service
 
-`OrdersService/` manages sales orders and supplier purchase orders with its own database (`stocksync_orders`). In Docker the direct API is http://localhost:5003/swagger; locally it runs on http://localhost:5045 with `dotnet run --project StockSync.Orders.WebApi --launch-profile http` from `OrdersService` (start `orders-db`, `rabbitmq` and InventoryService first, then run `dotnet ef database update --project StockSync.Orders.Infrastructure --startup-project StockSync.Orders.WebApi` with `ASPNETCORE_ENVIRONMENT=Development`). The gateway forwards `/api/orders` and `/api/purchase-orders` unchanged. RabbitMQ management is at http://localhost:15672 (`RABBITMQ_USER` / `RABBITMQ_PASSWORD`, default `stocksync`).
+`OrdersService/` manages sales orders and supplier purchase orders with its own database (`stocksync_orders`). The gateway routes Orders requests to its internal listener. Locally Orders runs on http://localhost:5045 with `dotnet run --project StockSync.Orders.WebApi --launch-profile http` from `OrdersService` (start `orders-db`, `rabbitmq` and InventoryService first, then run `dotnet ef database update --project StockSync.Orders.Infrastructure --startup-project StockSync.Orders.WebApi` with `ASPNETCORE_ENVIRONMENT=Development`). The gateway forwards `/api/orders` and `/api/purchase-orders` unchanged. With the development override, RabbitMQ management is at http://localhost:15672 (`RABBITMQ_USER` / `RABBITMQ_PASSWORD`, default `stocksync`).
 
 | Route | Purpose |
 | --- | --- |
@@ -210,4 +216,4 @@ STOCKSYNC_TEST_POSTGRES='Host=localhost;Database=postgres;Username=postgres;Pass
   dotnet test StockSync.Inventory.sln
 ```
 
-Run the same commands from `OrdersService` or `ReportingService` with the corresponding solution. Without that variable, PostgreSQL integration checks are skipped. Each integration check creates and removes its own database rather than changing application data. The gateway has no test directory; use `npm run typecheck` and `npm run build` to check it.
+Run the same commands from `OrdersService` or `ReportingService` with the corresponding solution. Without that variable, PostgreSQL integration checks are skipped. Each integration check creates and removes its own database rather than changing application data. For the gateway, run `npm run typecheck`, `npm run build` and `npm test` in `ApiGateway`. Its README describes the two-tenant integration test.

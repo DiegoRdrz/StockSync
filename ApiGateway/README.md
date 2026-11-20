@@ -4,13 +4,13 @@ TypeScript and NestJS gateway using Fastify. It serves as the HTTP entry point f
 
 ## Start with Docker
 
-From the StockSync repository root:
+Provision `JWT_SECRET_KEY` using the [root startup instructions](../README.md#run-with-docker), then run from the repository root:
 
 ```sh
 docker compose up -d --build
 ```
 
-Open http://localhost:9090/ for Inventory Swagger. Reporting is available through `/api/reports` and directly on port 5004 for development. The gateway can start while backends initialize. `/health` checks the gateway process.
+Open http://localhost:9090/ for Inventory Swagger. Reporting is available through `/api/reports`. The gateway can start while backends initialize. `/health` checks the gateway process.
 
 ## Run locally
 
@@ -24,7 +24,7 @@ npm ci
 npm run dev
 ```
 
-Use `INVENTORY_API_URL=http://localhost:5001` for inventory in Docker or `http://localhost:5041` for local .NET. Use `REPORTING_API_URL=http://localhost:5004` for Reporting in Docker or `http://localhost:5046` for local .NET. Restart after changing `.env`. Use `npm run build` followed by `npm start` for compiled execution. Avoid running the local and Docker gateways on the same port; `docker compose stop api-gateway` stops the container.
+The example environment points to the local .NET HTTP profiles. Set `JWT_SECRET_KEY` and Identity's `Jwt__SecretKey` to the same private value. Supply matching issuer and audience values when overriding the defaults. Restart after configuration changes. For compiled execution use `npm run build` and `npm start`.
 
 ## Routes and behavior
 
@@ -44,16 +44,17 @@ Use `INVENTORY_API_URL=http://localhost:5001` for inventory in Docker or `http:/
 | `/api/reports` and subpaths | Sales, purchases and inventory reports on ReportingService (same path upstream) |
 | `/swagger` and subpaths | Swagger UI and OpenAPI JSON |
 
-The Inventory prefix `/api/inventory` is rewritten to `/api`. Identity, Orders and Reporting paths are preserved.
+The Inventory prefix `/api/inventory` is rewritten to `/api`. Identity aliases under `/api/identity` map to `/api`. Orders and Reporting paths are preserved.
 
-The gateway overwrites the caller's `X-Tenant-Id`. Orders always uses the configured development `TENANT_ID`. Inventory and Reporting use the bearer JWT's `tenant_id` or `TenantId` claim and fall back to `TENANT_ID` when no usable claim is present. The gateway does not verify the JWT signature.
+The gateway verifies the HS256 access token and replaces any caller-supplied `X-Tenant-Id` with the verified `tenant_id`. Missing or invalid credentials return 401. Orders also requires this tenant to match `TENANT_ID` and returns 403 for a different tenant. Inventory and Reporting use the verified tenant for each request.
 
 ```sh
-curl http://localhost:9090/api/inventory/products
-curl http://localhost:9090/api/inventory/categories
-curl http://localhost:9090/api/inventory/movements
-curl http://localhost:9090/api/inventory/stock/branch/11111111-1111-1111-1111-111111111111
+curl -H "Authorization: Bearer ${ACCESS_TOKEN}" http://localhost:9090/api/inventory/products
 ```
+
+Public routes are GET /, GET /health, development Swagger reads, and POST login and register-tenant under both `/api/auth` and `/api/identity/auth`. All other proxied API routes require a bearer access token. Browser preflight terminates at the gateway. Swagger uses the same origin.
+
+Before forwarding, the proxy checks the HS256 signature, issuer, audience, expiration and any not-before time. It requires non-empty GUIDs in `sub` and `tenant_id`. Identity issues access tokens with an eight-hour default lifetime and currently provides no refresh flow. The gateway discards caller tenant headers on public requests. Only protected Identity requests receive the original bearer credential. Owner-only Identity writes and password changes by the owner or the user are checked at the gateway and again by Identity.
 
 ## Swagger
 
@@ -65,6 +66,9 @@ Other documentation is preserved. Documents are limited to 2 MiB; invalid docume
 
 | Variable | Default |
 | --- | --- |
+| `JWT_SECRET_KEY` | Required private signing key of at least 32 UTF-8 bytes |
+| `JWT_ISSUER` | `StockSync.Identity` |
+| `JWT_AUDIENCE` | `StockSync.Ecosystem` |
 | `HOST` | `127.0.0.1` |
 | `PORT` | `9090` |
 | `INVENTORY_API_URL` | `http://localhost:5001` |
@@ -116,7 +120,9 @@ npm run build     # Compile src/ into dist/.
 npm start         # Run dist/main.js.
 ```
 
-Docker includes compiled server code and production dependencies. There are no test or auxiliary script folders.
+Run `npm test` after building. The tests use signed credentials and recording upstreams. For the live workflow test set `STOCKSYNC_TEST_GATEWAY` to an isolated loopback gateway URL and provide `STOCKSYNC_TEST_OWNER_EMAIL` and `STOCKSYNC_TEST_OWNER_PASSWORD` for its configured Orders tenant. The test registers another tenant, creates business records and waits for their projections.
+
+The default Compose deployment trusts the Docker host and services on each private network. The business APIs trust the forwarded tenant header. Identity internally gives that header precedence over its claim. Keep those listeners out of untrusted networks. Local .NET HTTP profiles are intended for trusted development machines. Possession of the HS256 verification key also permits signing. Previously issued tokens may retain their privileges until expiration.
 
 ## Errors and request handling
 

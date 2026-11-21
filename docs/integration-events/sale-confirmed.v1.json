@@ -1,0 +1,21 @@
+{
+  "eventId": "ae093494-76d4-4509-8c26-c71774e28a24",
+  "occurredAt": "2026-11-18T14:30:00.144Z",
+  "tenantId": "00000000-0000-0000-0000-000000000001",
+  "orderId": "028abc5d-689a-4f2f-8664-f384d25bfe53",
+  "branchId": "11111111-1111-1111-1111-111111111111",
+  "confirmedAt": "2026-11-18T14:30:00.141Z",
+  "total": 37.5,
+  "lines": [
+    {
+      "lineNumber": 1,
+      "productId": "acb7143d-f88c-4d2d-9526-5b71f5e9db0c",
+      "productSku": "DEMO-HER-001",
+      "productName": "Demo hammer",
+      "quantity": 3,
+      "unitPrice": 12.5,
+      "lineTotal": 37.5,
+      "stockMovementId": "a47322d6-73b2-49f5-ac59-8fdc7ce0f445"
+    }
+  ]
+}

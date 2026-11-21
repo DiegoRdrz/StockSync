@@ -1,4 +1,6 @@
+using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Application.Common.Exceptions;
+using StockSync.Inventory.Application.IntegrationEvents;
 using StockSync.Inventory.Application.Movements;
 using StockSync.Inventory.Application.Stocks;
 using StockSync.Inventory.Domain.Entities;
@@ -11,12 +13,43 @@ namespace StockSync.Inventory.UnitTests.Application;
 public partial class StockServiceTests
 {
     private readonly FakeMovementRepository _movements = new();
-    private StockMovementService CreateMovementService() => new(_stockRepository, _productRepository, _movements, _unitOfWork);
+    private readonly RecordingOutbox _outbox = new();
+    private readonly TestTenant _tenant = new(Guid.NewGuid());
+    private StockMovementService CreateMovementService() =>
+        new(_stockRepository, _productRepository, _movements, _outbox, _tenant, _unitOfWork);
+
+    private void AssertEvent(IIntegrationEvent integrationEvent, StockMovement movement, Product product, Guid branchId)
+    {
+        var recorded = Assert.IsType<StockMovementRecorded>(integrationEvent);
+        Assert.Equal(_tenant.TenantId, recorded.TenantId);
+        Assert.Equal(movement.Id, recorded.EventId);
+        Assert.Equal(movement.Id, recorded.MovementId);
+        Assert.Equal(movement.Date, recorded.OccurredAt);
+        Assert.Equal(movement.Date, recorded.MovementDate);
+        Assert.Equal(DateTimeKind.Utc, recorded.OccurredAt.Kind);
+        Assert.Equal(movement.StockId, recorded.StockId);
+        Assert.Equal(branchId, recorded.BranchId);
+        Assert.Equal(movement.Type.ToString(), recorded.Type);
+        Assert.Equal((movement.Quantity, movement.PreviousQuantity, movement.NewQuantity),
+            (recorded.Quantity, recorded.PreviousQuantity, recorded.NewQuantity));
+        Assert.Equal((product.Id, product.Sku, product.Name, product.MinimumStock, product.CategoryId),
+            (recorded.ProductId, recorded.ProductSku, recorded.ProductName, recorded.MinimumStock, recorded.CategoryId));
+    }
+
+    private sealed record TestTenant(Guid TenantId) : ICurrentTenant;
+
+    private sealed class RecordingOutbox : IIntegrationEventOutbox
+    {
+        public List<IIntegrationEvent> Events { get; } = [];
+
+        public void Enqueue(IIntegrationEvent integrationEvent) => Events.Add(integrationEvent);
+    }
 
     [Fact]
     public async Task Movements_ReceiptAndIssue_SaveBalanceAndHistory()
     {
         var product = CreateProduct();
+        product.Update("Updated name", "UPDATED-001", null, 1, 2, 6, Guid.NewGuid());
         var stock = await _service.CreateAsync(new StockRequest(product.Id, Guid.NewGuid(), 0), default);
         var service = CreateMovementService();
 
@@ -27,6 +60,11 @@ public partial class StockServiceTests
         Assert.Equal("Issue", issue.Type);
         Assert.Equal(0, (await _service.GetByIdAsync(stock.Id, default)).Quantity);
         Assert.Equal(2, _movements.Items.Count);
+        Assert.Collection(_outbox.Events,
+            message => AssertEvent(message, _movements.Items[0], product, stock.BranchId),
+            message => AssertEvent(message, _movements.Items[1], product, stock.BranchId));
+        Assert.Equal((0, 5), (entry.PreviousQuantity, entry.NewQuantity));
+        Assert.Equal((5, 0), (issue.PreviousQuantity, issue.NewQuantity));
         Assert.Equal(3, _stockRepository.SaveCount);
         Assert.Equal(issue, await service.GetByIdAsync(stock.Id, issue.Id, default));
     }
@@ -48,6 +86,7 @@ public partial class StockServiceTests
 
         Assert.Equal(5, (await _service.GetByIdAsync(stock.Id, default)).Quantity);
         Assert.Equal(StockMovementType.Adjustment, Assert.Single(_movements.Items).Type);
+        Assert.Single(_outbox.Events);
         Assert.Equal(1, _stockRepository.SaveCount);
     }
 
@@ -70,6 +109,7 @@ public partial class StockServiceTests
         await Assert.ThrowsAsync<ConflictException>(() => CreateMovementService().RecordIssueAsync(stock.Id, new(1), default));
         Assert.Equal(5, (await _service.GetByIdAsync(stock.Id, default)).Quantity);
         Assert.Equal(StockMovementType.Adjustment, Assert.Single(_movements.Items).Type);
+        Assert.Single(_outbox.Events);
     }
 
     [Fact]

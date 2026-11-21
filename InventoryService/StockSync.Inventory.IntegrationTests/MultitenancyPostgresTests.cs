@@ -6,6 +6,7 @@ using StockSync.Inventory.Application.Movements;
 using StockSync.Inventory.Application.Products;
 using StockSync.Inventory.Application.Stocks;
 using StockSync.Inventory.Infrastructure;
+using StockSync.Inventory.Infrastructure.Outbox;
 using StockSync.Inventory.Infrastructure.Repositories;
 
 namespace StockSync.Inventory.IntegrationTests;
@@ -20,11 +21,11 @@ public class MultitenancyPostgresTests : PostgresTestBase
 
     private static StockService CreateStockService(InventoryDbContext context) =>
         new(new StockRepository(context), new ProductRepository(context), new StockMovementRepository(context),
-            new UnitOfWork(context));
+            new EfIntegrationEventOutbox(context), new TestTenant(context.TenantId), new UnitOfWork(context));
 
     private static StockMovementService CreateMovementService(InventoryDbContext context) =>
         new(new StockRepository(context), new ProductRepository(context), new StockMovementRepository(context),
-            new UnitOfWork(context));
+            new EfIntegrationEventOutbox(context), new TestTenant(context.TenantId), new UnitOfWork(context));
 
     [PostgreSqlFact]
     public async Task TenantData_CannotBeReadOrReferencedByAnotherTenant()

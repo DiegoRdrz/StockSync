@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockSync.Reporting.Application;
 
 namespace StockSync.Reporting.WebApi.Controllers;
 
+[Authorize(Roles = "Owner")]
 [ApiController]
 [Route("api/reports/purchases")]
 public sealed class PurchaseReportsController(IPurchaseReports reports, TimeProvider clock) : ControllerBase

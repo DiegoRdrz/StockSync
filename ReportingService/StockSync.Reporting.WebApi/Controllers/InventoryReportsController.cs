@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockSync.Reporting.Application;
 using StockSync.Reporting.Application.Common;
 
 namespace StockSync.Reporting.WebApi.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/reports/inventory")]
 public sealed class InventoryReportsController(IInventoryReports reports, TimeProvider clock) : ControllerBase

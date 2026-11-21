@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using StockSync.Orders.Application.Common.Exceptions;
+using StockSync.Orders.Application.IntegrationEvents;
 using StockSync.Orders.Application.Inventory;
 using StockSync.Orders.Application.Lines;
 using StockSync.Orders.Application.Orders;
@@ -25,7 +27,8 @@ public class OrdersPostgresTests : PostgresTestBase
             new FixedTenant(tenantId), new UnitOfWork(context));
 
     private PurchaseOrderService CreatePurchaseOrderService(OrdersDbContext context) =>
-        new(new PurchaseOrderRepository(context), _inventory, new UnitOfWork(context));
+        new(new PurchaseOrderRepository(context), _inventory, new EfIntegrationEventOutbox(context),
+            new FixedTenant(context.TenantId), new UnitOfWork(context));
 
     [PostgreSqlFact]
     public async Task Order_LinesTotalsAndConfirmation_ArePersisted()
@@ -158,7 +161,7 @@ public class OrdersPostgresTests : PostgresTestBase
     }
 
     [PostgreSqlFact]
-    public async Task PurchaseOrder_ReceiveFlow_IsPersisted()
+    public async Task PurchaseOrder_ReceiveFlow_PersistsReceivedStateAndOutboxEvent()
     {
         var hammer = _inventory.Add(_branchId, balance: 0, purchasePrice: 7.25m);
         await using (var context = CreateContext(_tenantA))
@@ -174,8 +177,72 @@ public class OrdersPostgresTests : PostgresTestBase
         var stored = await check.PurchaseOrders.Include(p => p.Lines).SingleAsync();
         Assert.Equal(PurchaseOrderStatus.Received, stored.Status);
         Assert.Equal(29m, stored.Total);
+        var storedLine = Assert.Single(stored.Lines);
+        Assert.Equal(StockLineStatus.Applied, storedLine.StockStatus);
+        Assert.Equal(4, _inventory.Balance(hammer));
+
+        var message = Assert.Single(await check.OutboxMessages.ToListAsync());
+        Assert.Equal("orders.purchase-order-received.v1", message.EventType);
+        Assert.Equal(_tenantA, message.TenantId);
+        Assert.Null(message.ProcessedAt);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var received = Assert.IsType<PurchaseOrderReceived>(JsonSerializer.Deserialize<PurchaseOrderReceived>(message.Payload, options));
+        Assert.Equal(message.Id, received.EventId);
+        var storedPrecision = received.OccurredAt.AddTicks(-(received.OccurredAt.Ticks % TimeSpan.TicksPerMicrosecond));
+        Assert.Equal(storedPrecision, message.OccurredAt);
+        Assert.Equal(_tenantA, received.TenantId);
+        Assert.Equal(stored.Id, received.PurchaseOrderId);
+        Assert.Equal(stored.ReceivedAt, received.ReceivedAt);
+        Assert.Equal(stored.Total, received.Total);
+        Assert.Equal(storedLine.StockMovementId, Assert.Single(received.Lines).StockMovementId);
+    }
+
+    [PostgreSqlFact]
+    public async Task PurchaseOrder_FinalCommitFailure_RollsBackReceivedStateAndOutboxEvent()
+    {
+        var hammer = _inventory.Add(_branchId, balance: 0);
+        Guid purchaseOrderId;
+        await using (var context = CreateContext(_tenantA))
+        {
+            var service = CreatePurchaseOrderService(context);
+            purchaseOrderId = (await service.CreateAsync(new PurchaseOrderRequest(_branchId, "Acme", null), default)).Id;
+            await service.AddLineAsync(purchaseOrderId, new LineRequest(hammer, 4), default);
+            await service.PlaceAsync(purchaseOrderId, default);
+
+            // A deferred trigger checks that the insert is visible at commit before forcing PostgreSQL to roll it back.
+            await context.Database.ExecuteSqlRawAsync("""
+                CREATE FUNCTION reject_purchase_receipt() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM "OutboxMessages"
+                        WHERE "EventType" = 'orders.purchase-order-received.v1'
+                          AND "TenantId" = NEW."TenantId"
+                          AND "Payload"->>'purchaseOrderId' = NEW."Id"::text
+                    ) THEN
+                        RAISE EXCEPTION 'Purchase receipt event missing at commit';
+                    END IF;
+                    RAISE EXCEPTION 'Forced failure at purchase receipt commit';
+                END;
+                $$;
+
+                CREATE CONSTRAINT TRIGGER reject_purchase_receipt
+                AFTER UPDATE ON "PurchaseOrders" DEFERRABLE INITIALLY DEFERRED
+                FOR EACH ROW WHEN (NEW."Status" = 'Received')
+                EXECUTE FUNCTION reject_purchase_receipt();
+                """);
+
+            var error = await Record.ExceptionAsync(() => service.ReceiveAsync(purchaseOrderId, default));
+            var postgresError = Assert.IsType<PostgresException>(error?.GetBaseException());
+            Assert.Equal("Forced failure at purchase receipt commit", postgresError.MessageText);
+        }
+
+        await using var check = CreateContext(_tenantA);
+        var stored = await check.PurchaseOrders.Include(p => p.Lines).SingleAsync(p => p.Id == purchaseOrderId);
+        Assert.Equal(PurchaseOrderStatus.Receiving, stored.Status);
+        Assert.Null(stored.ReceivedAt);
         Assert.Equal(StockLineStatus.Applied, Assert.Single(stored.Lines).StockStatus);
         Assert.Equal(4, _inventory.Balance(hammer));
+        Assert.Empty(await check.OutboxMessages.ToListAsync());
     }
 
     // Inventory stub with real balances, enough to drive the saga against PostgreSQL.

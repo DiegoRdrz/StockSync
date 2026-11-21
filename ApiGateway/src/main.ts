@@ -11,6 +11,7 @@ try {
   Logger.log(`Inventory: ${config.upstream.origin}`, 'Bootstrap');
   Logger.log(`Identity: ${config.identityUpstream.origin}`, 'Bootstrap');
   Logger.log(`Orders: ${config.ordersUpstream.origin}`, 'Bootstrap');
+  Logger.log(`Reporting: ${config.reportingUpstream.origin}`, 'Bootstrap');
 } catch (error) {
   Logger.error(error, 'Bootstrap');
   process.exitCode = 1;

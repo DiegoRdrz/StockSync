@@ -1,5 +1,6 @@
 using StockSync.Orders.Application.Common;
 using StockSync.Orders.Application.Common.Exceptions;
+using StockSync.Orders.Application.IntegrationEvents;
 using StockSync.Orders.Application.Inventory;
 using StockSync.Orders.Application.Lines;
 using StockSync.Orders.Application.Stock;
@@ -12,16 +13,22 @@ public class PurchaseOrderService : IPurchaseOrderService
 {
     private readonly IPurchaseOrderRepository _purchaseOrderRepository;
     private readonly IInventoryClient _inventory;
+    private readonly IIntegrationEventOutbox _outbox;
+    private readonly ICurrentTenant _currentTenant;
     private readonly IUnitOfWork _unitOfWork;
     private readonly StockSaga _stockSaga;
 
     public PurchaseOrderService(
         IPurchaseOrderRepository purchaseOrderRepository,
         IInventoryClient inventory,
+        IIntegrationEventOutbox outbox,
+        ICurrentTenant currentTenant,
         IUnitOfWork unitOfWork)
     {
         _purchaseOrderRepository = purchaseOrderRepository;
         _inventory = inventory;
+        _outbox = outbox;
+        _currentTenant = currentTenant;
         _unitOfWork = unitOfWork;
         _stockSaga = new StockSaga(inventory);
     }
@@ -133,6 +140,7 @@ public class PurchaseOrderService : IPurchaseOrderService
         {
             case StockSagaOutcome.Completed:
                 purchaseOrder.CompleteReceiving();
+                _outbox.Enqueue(PurchaseOrderReceived.From(purchaseOrder, _currentTenant.TenantId));
                 await _purchaseOrderRepository.SaveChangesAsync(CancellationToken.None);
                 return PurchaseOrderResponse.From(purchaseOrder);
 

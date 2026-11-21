@@ -6,6 +6,7 @@ import { GATEWAY_OPTIONS, GatewayConfigService, type GatewayOptions } from '../i
 import { InventoryProxyService } from '../infrastructure/proxy/inventory-proxy.service.js';
 import { IdentityProxyService } from '../infrastructure/proxy/identity-proxy.service.js';
 import { OrdersProxyService } from '../infrastructure/proxy/orders-proxy.service.js';
+import { ReportingProxyService } from '../infrastructure/proxy/reporting-proxy.service.js';
 
 @Module({})
 export class AppModule {
@@ -20,6 +21,7 @@ export class AppModule {
         InventoryProxyService,
         IdentityProxyService,
         OrdersProxyService,
+        ReportingProxyService,
       ],
     };
   }

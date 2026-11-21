@@ -5,6 +5,7 @@ export interface GatewayOptions {
   upstream: string | URL;
   identityUpstream?: string | URL;
   ordersUpstream?: string | URL;
+  reportingUpstream?: string | URL;
   timeoutMs?: number;
   logger?: boolean;
   caPem?: string;
@@ -13,13 +14,11 @@ export interface GatewayOptions {
 
 @Injectable()
 export class GatewayConfigService {
-  readonly options: Required<Omit<GatewayOptions, 'identityUpstream' | 'ordersUpstream'>> & {
-    identityUpstream: string | URL;
-    ordersUpstream: string | URL;
-  };
+  readonly options: Required<GatewayOptions>;
 
   constructor(@Inject(GATEWAY_OPTIONS) options: GatewayOptions) {
     this.options = {
+      reportingUpstream: 'http://localhost:5004',
       ordersUpstream: 'http://localhost:5003',
       identityUpstream: 'http://localhost:5002',
       timeoutMs: 10000,

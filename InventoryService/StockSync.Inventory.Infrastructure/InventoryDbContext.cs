@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Domain.Entities;
+using StockSync.Inventory.Infrastructure.Outbox;
 
 namespace StockSync.Inventory.Infrastructure;
 
@@ -27,6 +28,7 @@ public class InventoryDbContext : DbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Stock> Stocks => Set<Stock>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,7 +60,7 @@ public class InventoryDbContext : DbContext
     {
         foreach (var entry in ChangeTracker.Entries().Where(e => e.State == EntityState.Added))
         {
-            if (entry.Metadata.FindProperty(TenantIdProperty) is not null)
+            if (entry.Metadata.FindProperty(TenantIdProperty)?.IsShadowProperty() == true)
                 entry.Property(TenantIdProperty).CurrentValue = TenantId;
         }
     }

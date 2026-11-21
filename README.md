@@ -10,7 +10,8 @@ Multi-tenant SaaS inventory, orders, identity, and reporting platform built with
 | **Inventory Service** | `5001` | <http://localhost:5001/swagger> | .NET 8 (English) |
 | **Identity Service** | `5002` | <http://localhost:5002/swagger> | .NET 8 (English) |
 | **Orders Service** | `5003` | <http://localhost:5003/swagger> | .NET 8 (English) |
-| **Reporting Service** | `5004` | <http://localhost:5004/swagger> | .NET 8 |
+| **Reporting Service** | `5004` | <http://localhost:5004/swagger> | .NET 8 (English) |
+| **Notification Service** | `5005` | <http://localhost:5005/swagger> | .NET 8 (English) |
 
 For dedicated service documentation:
 
@@ -18,6 +19,7 @@ For dedicated service documentation:
 - [Identity Service Documentation](IdentityService/README.md)
 - [Orders Service Documentation](#orders-service)
 - [Reporting Service Documentation](ReportingService/README.md)
+- [Notification Service Documentation](NotificationService/README.md)
 - [API Gateway Documentation](ApiGateway/README.md)
 
 ## Run with Docker
@@ -45,7 +47,7 @@ The image enables `Initialization__ApplyMigrations=true`. With multiple API repl
 
 ![Project architecture](Assets/Diagram.png)
 
-ReportingService is implemented. Notification remains planned.
+All five backend microservices (Identity, Inventory, Orders, Reporting and Notification) and the API Gateway are implemented.
 
 ## Run locally
 
@@ -104,6 +106,7 @@ The gateway maps `/api/inventory/...` to `/api/...` on Inventory and preserves O
 | `/api/reports/purchases/summary`, `/api/reports/purchases/daily` | Received purchase totals |
 | `/api/reports/inventory/movements/summary` | Movement totals by type, UTC day and product |
 | `/api/reports/inventory/low-stock` | Latest known balances below minimum, paginated |
+| `/api/notifications`, `/api/notifications/recipients` | Alert delivery history and recipient management (Email and WhatsApp) |
 
 Product requests use `name`, `sku`, `description`, `purchasePrice`, `salePrice`, `minimumStock` and `categoryId`. Stock creation uses `productId`, `branchId` and `quantity`; a manual update uses `newQuantity`. Receipt and issue requests use `quantity`.
 

@@ -7,6 +7,7 @@ import { InventoryProxyService } from '../infrastructure/proxy/inventory-proxy.s
 import { IdentityProxyService } from '../infrastructure/proxy/identity-proxy.service.js';
 import { OrdersProxyService } from '../infrastructure/proxy/orders-proxy.service.js';
 import { ReportingProxyService } from '../infrastructure/proxy/reporting-proxy.service.js';
+import { NotificationProxyService } from '../infrastructure/proxy/notification-proxy.service.js';
 
 @Module({})
 export class AppModule {
@@ -22,6 +23,7 @@ export class AppModule {
         IdentityProxyService,
         OrdersProxyService,
         ReportingProxyService,
+        NotificationProxyService,
       ],
     };
   }

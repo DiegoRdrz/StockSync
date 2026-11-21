@@ -42,11 +42,12 @@ Use `INVENTORY_API_URL=http://localhost:5001` for inventory in Docker or `http:/
 | `/api/orders` and subpaths | Sales orders on OrdersService (same path upstream) |
 | `/api/purchase-orders` and subpaths | Purchase orders on OrdersService (same path upstream) |
 | `/api/reports` and subpaths | Sales, purchases and inventory reports on ReportingService (same path upstream) |
+| `/api/notifications` and subpaths | Notification history and recipient management on NotificationService (same path upstream) |
 | `/swagger` and subpaths | Swagger UI and OpenAPI JSON |
 
-The Inventory prefix `/api/inventory` is rewritten to `/api`. Identity, Orders and Reporting paths are preserved.
+The Inventory prefix `/api/inventory` is rewritten to `/api`. Identity, Orders, Reporting and Notification paths are preserved.
 
-The gateway overwrites the caller's `X-Tenant-Id`. Orders always uses the configured development `TENANT_ID`. Inventory and Reporting use the bearer JWT's `tenant_id` or `TenantId` claim and fall back to `TENANT_ID` when no usable claim is present. The gateway does not verify the JWT signature.
+The gateway overwrites the caller's `X-Tenant-Id`. Orders always uses the configured development `TENANT_ID`. Inventory, Reporting and Notification use the bearer JWT's `tenant_id` or `TenantId` claim and fall back to `TENANT_ID` when no usable claim is present. The gateway does not verify the JWT signature.
 
 ```sh
 curl http://localhost:9090/api/inventory/products
@@ -71,6 +72,7 @@ Other documentation is preserved. Documents are limited to 2 MiB; invalid docume
 | `IDENTITY_API_URL` | `http://localhost:5002` |
 | `ORDERS_API_URL` | `http://localhost:5003` |
 | `REPORTING_API_URL` | `http://localhost:5004` |
+| `NOTIFICATION_API_URL` | `http://localhost:5005` |
 | `UPSTREAM_TIMEOUT_MS` | `10000` |
 | `TENANT_ID` | `00000000-0000-0000-0000-000000000001` |
 | `INVENTORY_CA_FILE` | Optional PEM file for an HTTPS backend |

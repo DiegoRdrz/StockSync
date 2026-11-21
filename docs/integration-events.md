@@ -6,13 +6,14 @@ Events are published to `stocksync.events`, a durable topic exchange with auto-d
 
 | Routing key | Producer | Consumer | Meaning |
 | --- | --- | --- | --- |
+| `orders.order-created.v1` | OrdersService | NotificationService | A draft sales order was created. Triggers Email and WhatsApp order alerts. |
 | `orders.sale-confirmed.v1` | OrdersService | ReportingService | Informational sale record. Inventory has already issued the stock. |
 | `orders.purchase-order-received.v1` | OrdersService | ReportingService | Informational purchase receipt record. Inventory has already received the stock. |
-| `inventory.stock-movement-recorded.v1` | InventoryService | ReportingService | A committed receipt, issue, or adjustment. |
+| `inventory.stock-movement-recorded.v1` | InventoryService | ReportingService, NotificationService | A committed receipt, issue, or adjustment. Triggers low-stock alerts when the new balance falls below a positive `minimumStock`. |
 
 `SaleConfirmed` is informational. Inventory movements are the source of truth for inventory reporting. Movement events include saga compensation movements because each compensation changes stock through an actual receipt or issue. Sale and purchase events never change stock projections.
 
-OrdersService also publishes `orders.order-created.v1` when a draft sale is created. ReportingService does not consume it.
+`NotificationService` consumes `orders.order-created.v1` and `inventory.stock-movement-recorded.v1` through dedicated durable queues (`notification.orders` and `notification.stock-movements`).
 
 ## Versioning and fixtures
 
@@ -20,6 +21,7 @@ The routing key ends in `vN`, where `N` is the contract version. Use a new versi
 
 These JSON bodies are the single source of truth for producer and consumer contract tests:
 
+- [`order-created.v1.json`](integration-events/order-created.v1.json)
 - [`sale-confirmed.v1.json`](integration-events/sale-confirmed.v1.json)
 - [`purchase-order-received.v1.json`](integration-events/purchase-order-received.v1.json)
 - [`stock-movement-recorded.v1.json`](integration-events/stock-movement-recorded.v1.json)

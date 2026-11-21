@@ -79,8 +79,7 @@ Content-Type: application/json
 
 {
   "email": "owner@stocksync.demo",
-  "password": "Owner123!*",
-  "tenantId": "{{defaultTenantId}}"
+  "password": "Password123!"
 }
 
 ### Store Owner Token from response
@@ -94,8 +93,7 @@ Content-Type: application/json
 
 {
   "email": "employee@stocksync.demo",
-  "password": "Employee123!*",
-  "tenantId": "{{defaultTenantId}}"
+  "password": "Password123!"
 }
 
 ### Store Employee Token from response

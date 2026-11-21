@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockSync.Notification.Application.Common;
 using StockSync.Notification.Application.Notifications;
 
 namespace StockSync.Notification.WebApi.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/notifications")]
 [Produces("application/json")]

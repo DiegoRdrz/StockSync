@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockSync.Notification.Application.Common;
 using StockSync.Notification.Application.Recipients;
 
 namespace StockSync.Notification.WebApi.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/notifications/recipients")]
 [Produces("application/json")]
@@ -17,6 +19,7 @@ public class NotificationRecipientsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(NotificationRecipientResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -45,6 +48,7 @@ public class NotificationRecipientsController : ControllerBase
         Ok(await _recipientService.ListAsync(filter, cancellationToken));
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(NotificationRecipientResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -56,6 +60,7 @@ public class NotificationRecipientsController : ControllerBase
         Ok(await _recipientService.UpdateAsync(id, request, cancellationToken));
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)

@@ -8,6 +8,8 @@ import { IdentityProxyService } from '../infrastructure/proxy/identity-proxy.ser
 import { OrdersProxyService } from '../infrastructure/proxy/orders-proxy.service.js';
 import { ReportingProxyService } from '../infrastructure/proxy/reporting-proxy.service.js';
 
+import { AccessTokenVerifier } from '../infrastructure/auth/access-token-verifier.service.js';
+
 @Module({})
 export class AppModule {
   static register(options: GatewayOptions): DynamicModule {
@@ -18,6 +20,7 @@ export class AppModule {
         { provide: HealthService, useFactory: () => new HealthService() },
         { provide: GATEWAY_OPTIONS, useValue: options },
         GatewayConfigService,
+        AccessTokenVerifier,
         InventoryProxyService,
         IdentityProxyService,
         OrdersProxyService,

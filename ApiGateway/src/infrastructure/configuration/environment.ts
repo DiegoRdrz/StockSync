@@ -10,7 +10,10 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   const tenantId = readTenantId(env.TENANT_ID || '00000000-0000-0000-0000-000000000001');
   const caPem = env.INVENTORY_CA_FILE ? readFileSync(env.INVENTORY_CA_FILE, 'utf8') : '';
 
-  return { upstream, identityUpstream, ordersUpstream, reportingUpstream, port, timeoutMs, caPem, tenantId, host: env.HOST || '127.0.0.1' };
+  const jwtSecret = env.JWT_SECRET_KEY ?? '';
+  const jwtIssuer = env.JWT_ISSUER ?? 'StockSync.Identity';
+  const jwtAudience = env.JWT_AUDIENCE ?? 'StockSync.Ecosystem';
+  return { jwtSecret, jwtIssuer, jwtAudience, upstream, identityUpstream, ordersUpstream, reportingUpstream, port, timeoutMs, caPem, tenantId, host: env.HOST || '127.0.0.1' };
 }
 
 function readUpstream(value: string, name = 'INVENTORY_API_URL'): URL {

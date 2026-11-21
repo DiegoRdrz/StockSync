@@ -1,0 +1,36 @@
+@host = http://localhost:5047
+@tenant = 00000000-0000-0000-0000-000000000001
+
+### List notification recipients
+GET {{host}}/api/notifications/recipients
+X-Tenant-Id: {{tenant}}
+
+### Create an Email recipient
+POST {{host}}/api/notifications/recipients
+Content-Type: application/json
+X-Tenant-Id: {{tenant}}
+
+{
+  "name": "Warehouse Supervisor",
+  "channel": "Email",
+  "destination": "warehouse@stocksync.demo"
+}
+
+### Create a WhatsApp recipient
+POST {{host}}/api/notifications/recipients
+Content-Type: application/json
+X-Tenant-Id: {{tenant}}
+
+{
+  "name": "Warehouse Supervisor WhatsApp",
+  "channel": "WhatsApp",
+  "destination": "+573001234567"
+}
+
+### List sent notifications
+GET {{host}}/api/notifications?page=1&pageSize=20
+X-Tenant-Id: {{tenant}}
+
+### Filter notifications by event type and channel
+GET {{host}}/api/notifications?eventType=LowStock&channel=Email
+X-Tenant-Id: {{tenant}}

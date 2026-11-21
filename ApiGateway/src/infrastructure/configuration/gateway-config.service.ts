@@ -6,6 +6,7 @@ export interface GatewayOptions {
   identityUpstream?: string | URL;
   ordersUpstream?: string | URL;
   reportingUpstream?: string | URL;
+  notificationUpstream?: string | URL;
   timeoutMs?: number;
   logger?: boolean;
   caPem?: string;
@@ -18,6 +19,7 @@ export class GatewayConfigService {
 
   constructor(@Inject(GATEWAY_OPTIONS) options: GatewayOptions) {
     this.options = {
+      notificationUpstream: 'http://localhost:5005',
       reportingUpstream: 'http://localhost:5004',
       ordersUpstream: 'http://localhost:5003',
       identityUpstream: 'http://localhost:5002',

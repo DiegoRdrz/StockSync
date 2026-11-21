@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockSync.Orders.Application.Common;
 using StockSync.Orders.Application.Lines;
@@ -5,6 +6,7 @@ using StockSync.Orders.Application.Orders;
 
 namespace StockSync.Orders.WebApi.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/orders")]
 [Produces("application/json")]
@@ -71,6 +73,7 @@ public class OrdersController : ControllerBase
     // 200: confirmed and stock issued. 409: insufficient stock or invalid state; stock unchanged.
     // 503: Inventory unavailable; stock unchanged, or the order requires review when the result is unknown.
     [HttpPost("{id:guid}/confirm")]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -80,6 +83,7 @@ public class OrdersController : ControllerBase
         Ok(await _orderService.ConfirmAsync(id, cancellationToken));
 
     [HttpPost("{id:guid}/cancel")]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]

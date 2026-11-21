@@ -26,6 +26,9 @@ services:
       - ConnectionStrings__DefaultConnection=Host=inventory-db;Database=stocksync_inventory;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
       - Initialization__ApplyMigrations=true
       - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-true}
+      - Jwt__Issuer=StockSync.Identity
+      - Jwt__Audience=StockSync.Ecosystem
+      - Jwt__SecretKey=${JWT_SECRET_KEY:-StockSyncSuperSecretSecureKey123456789!NeverShareInProduction!}
       - RabbitMq__ConnectionString=amqp://${RABBITMQ_USER:-stocksync}:${RABBITMQ_PASSWORD:-stocksync}@rabbitmq:5672
     depends_on:
       inventory-db:
@@ -112,6 +115,9 @@ services:
       - Initialization__ApplyMigrations=true
       - Inventory__BaseUrl=http://inventory-api:8080
       - RabbitMq__ConnectionString=amqp://${RABBITMQ_USER:-stocksync}:${RABBITMQ_PASSWORD:-stocksync}@rabbitmq:5672
+      - Jwt__Issuer=StockSync.Identity
+      - Jwt__Audience=StockSync.Ecosystem
+      - Jwt__SecretKey=${JWT_SECRET_KEY:-StockSyncSuperSecretSecureKey123456789!NeverShareInProduction!}
     depends_on:
       orders-db:
         condition: service_healthy

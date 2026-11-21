@@ -8,7 +8,8 @@ using StockSync.Orders.Application.Inventory;
 namespace StockSync.Orders.Infrastructure.Inventory;
 
 // HTTP adapter for the Inventory Service API. It calls Inventory directly on the internal
-// network (not through the gateway) and forwards the current tenant in X-Tenant-Id.
+// network (not through the gateway) and forwards the current tenant in X-Tenant-Id and
+// the Authorization Bearer token when available from the active user context.
 public sealed class InventoryHttpClient : IInventoryClient
 {
     public const string TenantHeader = "X-Tenant-Id";
@@ -18,11 +19,16 @@ public sealed class InventoryHttpClient : IInventoryClient
 
     private readonly HttpClient _httpClient;
     private readonly ICurrentTenant _currentTenant;
+    private readonly IUserContext? _userContext;
 
-    public InventoryHttpClient(HttpClient httpClient, ICurrentTenant currentTenant)
+    public InventoryHttpClient(
+        HttpClient httpClient,
+        ICurrentTenant currentTenant,
+        IUserContext? userContext = null)
     {
         _httpClient = httpClient;
         _currentTenant = currentTenant;
+        _userContext = userContext;
     }
 
     public async Task<InventoryProduct?> GetProductAsync(Guid productId, CancellationToken cancellationToken)
@@ -135,6 +141,13 @@ public sealed class InventoryHttpClient : IInventoryClient
     {
         var request = new HttpRequestMessage(method, path);
         request.Headers.Add(TenantHeader, _currentTenant.TenantId.ToString());
+
+        var authHeader = _userContext?.AuthorizationHeader;
+        if (!string.IsNullOrWhiteSpace(authHeader))
+        {
+            request.Headers.TryAddWithoutValidation("Authorization", authHeader);
+        }
+
         return request;
     }
 

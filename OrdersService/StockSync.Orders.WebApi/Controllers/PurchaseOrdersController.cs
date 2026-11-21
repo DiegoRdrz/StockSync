@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockSync.Orders.Application.Common;
 using StockSync.Orders.Application.Lines;
@@ -5,6 +6,7 @@ using StockSync.Orders.Application.PurchaseOrders;
 
 namespace StockSync.Orders.WebApi.Controllers;
 
+[Authorize(Roles = "Owner")]
 [ApiController]
 [Route("api/purchase-orders")]
 [Produces("application/json")]

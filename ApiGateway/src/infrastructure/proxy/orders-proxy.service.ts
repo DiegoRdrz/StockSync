@@ -2,7 +2,7 @@ import { ordersRoutes } from '../../application/routing/orders-routes.js';
 import { Injectable } from '@nestjs/common';
 import type { FastifyInstance } from 'fastify';
 import httpProxy, { type FastifyHttpProxyOptions } from '@fastify/http-proxy';
-import { cleanHeaders, prepareRequestHeaders, toPublicLocation } from './proxy-headers.js';
+import { cleanHeaders, extractTenantFromAuthorization, prepareRequestHeaders, toPublicLocation } from './proxy-headers.js';
 import { GatewayConfigService } from '../configuration/gateway-config.service.js';
 
 @Injectable()
@@ -33,13 +33,17 @@ export class OrdersProxyService {
 function createReplyOptions(target: URL, tenantId: string): FastifyHttpProxyOptions['replyOptions'] {
   return {
     rewriteRequestHeaders(request, original) {
+      const authHeader = original.authorization ? String(original.authorization) : undefined;
+      const tokenTenant = extractTenantFromAuthorization(authHeader);
+      const effectiveTenantId = tokenTenant || tenantId;
+
       return {
         ...prepareRequestHeaders(original, false),
         'x-request-id': request.id,
         'x-forwarded-for': request.ip,
         'x-forwarded-proto': request.protocol,
         'x-forwarded-host': request.host,
-        'x-tenant-id': tenantId,
+        'x-tenant-id': effectiveTenantId,
       };
     },
     rewriteHeaders(original, request) {

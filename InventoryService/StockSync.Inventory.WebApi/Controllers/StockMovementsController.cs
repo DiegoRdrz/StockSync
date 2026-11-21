@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Application.Movements;
 
 namespace StockSync.Inventory.WebApi.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/stock/{stockId:guid}")]
 [Produces("application/json")]
@@ -32,6 +34,7 @@ public class StockMovementsController : ControllerBase
         Ok(await _service.ListAllAsync(page, cancellationToken));
 
     [HttpPost("receipts")]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(StockMovementResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -43,6 +46,7 @@ public class StockMovementsController : ControllerBase
     }
 
     [HttpPost("issues")]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(StockMovementResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]

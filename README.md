@@ -182,6 +182,37 @@ Receiving a purchase order uses the same saga with receipts, compensated with is
 
 `OrderCreated` and `SaleConfirmed` are written to `OutboxMessages` in the same transaction as the order change (transactional outbox) and published by a background worker to the durable topic exchange `stocksync.events` with routing keys `orders.order-created.v1` and `orders.sale-confirmed.v1`. Each message has the event ID as `message_id`, the event type as `type` and a `tenant-id` header; the JSON body uses camelCase. Delivery is at least once, so consumers must deduplicate by event ID and declare their own queues. `SaleConfirmed` is informational: Inventory has already issued the stock, so consuming it to decrement stock again would double the decrement. Without `RabbitMq:ConnectionString`, events stay in the outbox.
 
+## Security & Role-Based Authorization
+
+The solution enforces authentication and authorization across all microservices using ASP.NET Core Identity concepts and JWT Bearer tokens:
+
+- **Identity Service (`IdentityService/`)**: Authenticates users with credentials and issues signed JWT tokens containing user claims (`sub`, `email`, `role`, `tenant_id`, `tenant_name`).
+- **Seeders**: Pre-populates the demo tenant (`00000000-0000-0000-0000-000000000001`) with two initial roles and users:
+  - **Owner**: `owner@stocksync.demo` / `Owner123!*` (Full administrative privileges)
+  - **Employee**: `employee@stocksync.demo` / `Employee123!*` (Operational privileges: view inventory, draft customer orders)
+- **Protected Microservices**: `InventoryService` and `OrdersService` validate JWT tokens issued by `IdentityService` using the shared secret key, issuer, and audience.
+- **Role Permissions**:
+  - `Owner`: Create/update/delete products, categories, manual stock adjustments, purchase orders, and sales order confirmations.
+  - `Employee`: View products, stock balances, categories, and create draft orders. Accessing owner-restricted endpoints returns `403 Forbidden`.
+
+### Security Demo Script
+
+A complete test script for all 8 required evaluation scenarios is available in:
+👉 [`EndToEnd-Security-Demo.http`](file:///EndToEnd-Security-Demo.http)
+
+To run it:
+1. Start the stack: `docker compose up -d --build`
+2. Open `EndToEnd-Security-Demo.http` in VS Code with the **REST Client** extension (or import requests into Postman/ThunderClient).
+3. Execute the scenarios sequentially to demonstrate:
+   - Microservices execution and health.
+   - Initial seeders.
+   - Login and JWT issuance for Owner and Employee.
+   - Access without token (`401 Unauthorized`).
+   - Access with valid token (`200 OK`).
+   - Access with required role (`201 Created`).
+   - Access without required role (`403 Forbidden`).
+   - Access with expired/tampered token (`401 Unauthorized`).
+
 ## Inventory service checks
 
 From `InventoryService`:

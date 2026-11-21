@@ -1,0 +1,217 @@
+### ==============================================================================
+### StockSync - Microservices Security & Role-Based Authorization Demo
+### Delivery 2 Technical Evaluation & Video Recording Script
+### ==============================================================================
+### This HTTP file contains all requests for the 8 required evaluation scenarios.
+### You can run this directly in VS Code (REST Client extension) or JetBrains Rider,
+### or import the endpoints into Postman / ThunderClient.
+
+@gatewayUrl = http://localhost:9090
+@identityUrl = http://localhost:5002
+@inventoryUrl = http://localhost:5001
+@ordersUrl = http://localhost:5003
+
+@defaultTenantId = 00000000-0000-0000-0000-000000000001
+
+
+### ==============================================================================
+### SCENARIO 1: Execution of the Microservices
+### Requirement: Show that all microservices and API Gateway are running healthy.
+### ==============================================================================
+
+# 1.1 API Gateway Health Check (Gateway + Proxy status)
+GET {{gatewayUrl}}/health
+Accept: application/json
+
+###
+
+# 1.2 Identity Service Swagger JSON / Health
+GET {{identityUrl}}/swagger/v1/swagger.json
+Accept: application/json
+
+###
+
+# 1.3 Inventory Service Swagger JSON
+GET {{inventoryUrl}}/swagger/v1/swagger.json
+Accept: application/json
+
+###
+
+# 1.4 Orders Service Swagger JSON
+GET {{ordersUrl}}/swagger/v1/swagger.json
+Accept: application/json
+
+
+### ==============================================================================
+### SCENARIO 2: Identity Initialization via Seeders
+### Requirement: Evidentiate creation of users and roles via Seeders (no manual CRUD).
+### Seeder initializes:
+###  - Tenant: StockSync Demo Store (00000000-0000-0000-0000-000000000001)
+###  - User 1: owner@stocksync.demo (Role: Owner)
+###  - User 2: employee@stocksync.demo (Role: Employee)
+### Note for video: Show docker compose logs or run the login endpoints below.
+### ==============================================================================
+
+
+### ==============================================================================
+### SCENARIO 3: Authentication and JWT Issuance
+### Requirement: Log in with valid credentials and display the generated JWT token.
+### ==============================================================================
+
+# 3.1 Login as Owner (Role: Owner)
+# @name loginOwner
+POST {{gatewayUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "owner@stocksync.demo",
+  "password": "Owner123!*",
+  "tenantId": "{{defaultTenantId}}"
+}
+
+### Store Owner Token from response
+@ownerToken = {{loginOwner.response.body.token}}
+
+
+### 3.2 Login as Employee (Role: Employee)
+# @name loginEmployee
+POST {{gatewayUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "employee@stocksync.demo",
+  "password": "Employee123!*",
+  "tenantId": "{{defaultTenantId}}"
+}
+
+### Store Employee Token from response
+@employeeToken = {{loginEmployee.response.body.token}}
+
+
+### ==============================================================================
+### SCENARIO 4: Access Without Token (Expected: HTTP 401 Unauthorized)
+### Requirement: Attempt to consume protected endpoints without JWT and show HTTP 401.
+### ==============================================================================
+
+# 4.1 Consume Inventory Service protected endpoint without token
+GET {{gatewayUrl}}/api/products
+Accept: application/json
+
+###
+
+# 4.2 Consume Orders Service protected endpoint without token
+GET {{gatewayUrl}}/api/orders
+Accept: application/json
+
+
+### ==============================================================================
+### SCENARIO 5: Access With Valid Token (Expected: HTTP 200 OK)
+### Requirement: Consume protected endpoint with a valid JWT and verify access.
+### ==============================================================================
+
+# 5.1 List products using valid Owner JWT
+GET {{gatewayUrl}}/api/products
+Authorization: Bearer {{ownerToken}}
+Accept: application/json
+
+###
+
+# 5.2 List products using valid Employee JWT
+GET {{gatewayUrl}}/api/products
+Authorization: Bearer {{employeeToken}}
+Accept: application/json
+
+###
+
+# 5.3 List orders using valid Owner JWT
+GET {{gatewayUrl}}/api/orders
+Authorization: Bearer {{ownerToken}}
+Accept: application/json
+
+
+### ==============================================================================
+### SCENARIO 6: Role-Based Authorization - With Required Role (Expected: HTTP 201 / 200)
+### Requirement: Demonstrate that a user with the required role (Owner) can perform
+### restricted management actions (Create product, Create Purchase Order).
+### ==============================================================================
+
+# 6.1 Owner creates a new product (Allowed for Role: Owner)
+# @name createProductAsOwner
+POST {{gatewayUrl}}/api/products
+Authorization: Bearer {{ownerToken}}
+Content-Type: application/json
+
+{
+  "name": "Mechanical Keyboard Pro RGB",
+  "sku": "KB-RGB-DEMO-01",
+  "description": "High-end mechanical keyboard for demo",
+  "purchasePrice": 45.00,
+  "salePrice": 89.99,
+  "stockMinimo": 10
+}
+
+###
+
+# 6.2 Owner creates a purchase order (Allowed for Role: Owner)
+POST {{gatewayUrl}}/api/purchase-orders
+Authorization: Bearer {{ownerToken}}
+Content-Type: application/json
+
+{
+  "branchId": "11111111-1111-1111-1111-111111111111",
+  "supplier": "Logitech Supplies Global",
+  "reference": "PO-DEMO-2026-001"
+}
+
+
+### ==============================================================================
+### SCENARIO 7: Role-Based Authorization - Without Required Role (Expected: HTTP 403 Forbidden)
+### Requirement: Demonstrate that an authenticated user without the required role (Employee)
+### receives HTTP 403 Forbidden when trying to perform Owner-only operations.
+### ==============================================================================
+
+# 7.1 Employee attempts to create a product (Denied -> HTTP 403 Forbidden)
+POST {{gatewayUrl}}/api/products
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "name": "Unauthorized Product By Employee",
+  "sku": "UNAUTH-SKU-999",
+  "description": "This should be forbidden with 403",
+  "purchasePrice": 10.00,
+  "salePrice": 20.00,
+  "stockMinimo": 5
+}
+
+###
+
+# 7.2 Employee attempts to create a purchase order (Denied -> HTTP 403 Forbidden)
+POST {{gatewayUrl}}/api/purchase-orders
+Authorization: Bearer {{employeeToken}}
+Content-Type: application/json
+
+{
+  "branchId": "11111111-1111-1111-1111-111111111111",
+  "supplier": "Unauthorized Supplier",
+  "reference": "PO-FORBIDDEN-001"
+}
+
+
+### ==============================================================================
+### SCENARIO 8: Invalid or Expired Token (Expected: HTTP 401 Unauthorized)
+### Requirement: Demonstrate that a tampered, invalid, or expired JWT cannot access protected endpoints.
+### ==============================================================================
+
+# 8.1 Access with malformed/tampered JWT (HTTP 401 Unauthorized)
+GET {{gatewayUrl}}/api/products
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalidpayloadsignaturetampered.xyz123
+Accept: application/json
+
+###
+
+# 8.2 Access with simulated expired JWT (HTTP 401 Unauthorized)
+# Token issued with expiration in the past (exp: 1514764800 -> Jan 1, 2018)
+GET {{gatewayUrl}}/api/products
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEiLCJleHAiOjE1MTQ3NjQ4MDB9.invalid
+Accept: application/json

@@ -23,6 +23,7 @@ var builder = WebApplication.CreateBuilder(args.Where(arg => arg is not "--migra
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenant, HttpCurrentTenant>();
+builder.Services.AddScoped<IUserContext, HttpUserContext>();
 builder.Services.AddDbContext<OrdersDbContext>(options => options
     .UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
     // Save failures mapped to 409 are not server errors; unexpected failures

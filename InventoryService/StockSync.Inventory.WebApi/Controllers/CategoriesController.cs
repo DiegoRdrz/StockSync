@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockSync.Inventory.Application.Categories;
 using StockSync.Inventory.Application.Common;
@@ -5,6 +6,7 @@ using StockSync.Inventory.Application.Products;
 
 namespace StockSync.Inventory.WebApi.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/categories")]
 [Produces("application/json")]
@@ -20,6 +22,7 @@ public class CategoriesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(CategoryResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -44,6 +47,7 @@ public class CategoriesController : ControllerBase
         Ok(await _categoryService.ListAsync(filter, cancellationToken));
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(CategoryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -55,6 +59,7 @@ public class CategoriesController : ControllerBase
         Ok(await _categoryService.UpdateAsync(id, request, cancellationToken));
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]

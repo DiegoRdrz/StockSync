@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StockSync.Inventory.Application.Common;
 using StockSync.Inventory.Application.Stocks;
 
 namespace StockSync.Inventory.WebApi.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/stock")]
 [Produces("application/json")]
@@ -17,6 +19,7 @@ public class StockController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(StockResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
@@ -60,6 +63,7 @@ public class StockController : ControllerBase
         Ok(await _stockService.ListLowStockAsync(filter, cancellationToken));
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(StockResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -71,6 +75,7 @@ public class StockController : ControllerBase
         Ok(await _stockService.UpdateQuantityAsync(id, request, cancellationToken));
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Owner")]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]

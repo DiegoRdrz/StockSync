@@ -153,6 +153,9 @@ services:
       - ConnectionStrings__DefaultConnection=Host=reporting-db;Database=stocksync_reporting;Username=postgres;Password=${POSTGRES_PASSWORD:-stock1234}
       - Initialization__ApplyMigrations=true
       - RabbitMq__ConnectionString=amqp://${RABBITMQ_USER:-stocksync}:${RABBITMQ_PASSWORD:-stocksync}@rabbitmq:5672
+      - Jwt__Issuer=StockSync.Identity
+      - Jwt__Audience=StockSync.Ecosystem
+      - Jwt__SecretKey=${JWT_SECRET_KEY:-StockSyncSuperSecretSecureKey123456789!NeverShareInProduction!}
     depends_on:
       reporting-db:
         condition: service_healthy
@@ -187,6 +190,9 @@ services:
       - Initialization__ApplyMigrations=true
       - Initialization__LoadDemoData=${LOAD_DEMO_DATA:-true}
       - RabbitMq__ConnectionString=amqp://${RABBITMQ_USER:-stocksync}:${RABBITMQ_PASSWORD:-stocksync}@rabbitmq:5672
+      - Jwt__Issuer=StockSync.Identity
+      - Jwt__Audience=StockSync.Ecosystem
+      - Jwt__SecretKey=${JWT_SECRET_KEY:-StockSyncSuperSecretSecureKey123456789!NeverShareInProduction!}
     depends_on:
       notification-db:
         condition: service_healthy

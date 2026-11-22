@@ -31,7 +31,16 @@ cp -n .env.example .env
 docker compose up -d --build
 ```
 
-Open **http://localhost:9090/swagger** for Inventory Swagger. Query Reporting under `/api/reports` on port 9090 or open its Swagger on port 5004. PostgreSQL uses host ports 5432 (Inventory), 5433 (Identity), 5434 (Orders) and 5435 (Reporting). RabbitMQ uses port 5672 for AMQP and 15672 for its management UI.
+Open **http://localhost:9090/swagger** for the API Gateway interactive multi-service Swagger UI, featuring quick-switch buttons to explore endpoints across all microservices (`🔐 Identity`, `📦 Inventory`, `🛒 Orders`, `📊 Reporting`, `🔔 Notifications`, and `🌐 All Services`).
+
+PostgreSQL databases run on host ports:
+- `5432`: Inventory (`stocksync_inventory`)
+- `5433`: Identity (`stocksync_identity`)
+- `5434`: Orders (`stocksync_orders`)
+- `5435`: Reporting (`stocksync_reporting`)
+- `5436`: Notification (`stocksync_notification`)
+
+RabbitMQ uses port `5672` for AMQP message broker and `15672` for its Web Management UI (credentials: `stocksync` / `stocksync`).
 
 Each API waits for its PostgreSQL database and applies pending migrations. Inventory and Identity load demo data when enabled. Repeated startup does not reset stock balances. Configure `POSTGRES_PASSWORD`, `LOAD_DEMO_DATA`, `GATEWAY_PORT` and `GATEWAY_TENANT_ID` in the root `.env`.
 
@@ -86,27 +95,31 @@ See [the gateway README](ApiGateway/README.md) for running the gateway with Node
 
 ## Public routes
 
-The gateway maps `/api/inventory/...` to `/api/...` on Inventory and preserves Orders and Reporting paths.
+The gateway maps requests to the respective microservices:
 
-| Gateway route | Purpose |
-| --- | --- |
-| `/api/inventory/products` | Product creation, updates, listing and soft deletion |
-| `/api/inventory/categories` | Categories and category products |
-| `/api/inventory/stock` | Product/branch assignments and quantity adjustments |
-| `/api/inventory/stock/branch/{branchId}` | Stock assigned to a branch |
-| `/api/inventory/stock/product/{productId}` | Stock assigned to a product |
-| `/api/inventory/stock/low-stock?branchId=...` | Active-product stock below its minimum |
-| `/api/inventory/stock/{stockId}/receipts` | Receive stock |
-| `/api/inventory/stock/{stockId}/issues` | Issue stock |
-| `/api/inventory/stock/{stockId}/movements` | Stock movement history |
-| `/api/inventory/movements` | Latest 10 movements across all stocks |
-| `/api/inventory/movements/page/{page}` | Subsequent pages of 10 movements |
-| `/api/orders`, `/api/purchase-orders` | Sales and purchase order workflows |
-| `/api/reports/sales` and subpaths | Sales summary, daily totals, top products and paginated sales |
-| `/api/reports/purchases/summary`, `/api/reports/purchases/daily` | Received purchase totals |
-| `/api/reports/inventory/movements/summary` | Movement totals by type, UTC day and product |
-| `/api/reports/inventory/low-stock` | Latest known balances below minimum, paginated |
-| `/api/notifications`, `/api/notifications/recipients` | Alert delivery history and recipient management (Email and WhatsApp) |
+| Gateway route | Service | Purpose |
+| --- | --- | --- |
+| `/api/auth/register-tenant` | Identity | Register a new tenant organization and owner user |
+| `/api/auth/login` | Identity | Authenticate credentials and receive a signed JWT token |
+| `/api/auth/me` | Identity | Retrieve current authenticated user and tenant profile |
+| `/api/users`, `/api/tenants` | Identity | User management and tenant administration |
+| `/api/products` (or `/api/inventory/products`) | Inventory | Product creation, updates, listing and soft deletion |
+| `/api/categories` (or `/api/inventory/categories`) | Inventory | Categories and category products |
+| `/api/stock` (or `/api/inventory/stock`) | Inventory | Product/branch assignments and quantity adjustments |
+| `/api/stock/branch/{branchId}` | Inventory | Stock assigned to a branch |
+| `/api/stock/product/{productId}` | Inventory | Stock assigned to a product |
+| `/api/stock/low-stock?branchId=...` | Inventory | Active-product stock below its minimum |
+| `/api/stock/{stockId}/receipts` | Inventory | Receive stock |
+| `/api/stock/{stockId}/issues` | Inventory | Issue stock |
+| `/api/stock/{stockId}/movements` | Inventory | Stock movement history |
+| `/api/movements` | Inventory | Latest 10 movements across all stocks |
+| `/api/movements/page/{page}` | Inventory | Subsequent pages of 10 movements |
+| `/api/orders`, `/api/purchase-orders` | Orders | Sales and purchase order workflows (with saga compensation) |
+| `/api/reports/sales` and subpaths | Reporting | Sales summary, daily totals, top products and paginated sales |
+| `/api/reports/purchases/summary`, `.../daily` | Reporting | Received purchase totals |
+| `/api/reports/inventory/movements/summary` | Reporting | Movement totals by type, UTC day and product |
+| `/api/reports/inventory/low-stock` | Reporting | Latest known balances below minimum, paginated |
+| `/api/notifications`, `.../recipients` | Notification | Alert delivery history and recipient management (Email and WhatsApp) |
 
 Product requests use `name`, `sku`, `description`, `purchasePrice`, `salePrice`, `minimumStock` and `categoryId`. Stock creation uses `productId`, `branchId` and `quantity`; a manual update uses `newQuantity`. Receipt and issue requests use `quantity`.
 
@@ -201,20 +214,29 @@ ReportingService projects confirmed sales, received purchase orders and inventor
 
 Orders also publishes `orders.order-created.v1` for draft sales. Sales and purchases provide commercial totals. Inventory movements drive inventory reporting, including saga compensation movements. See [integration event contracts and development replay](docs/integration-events.md) and the [ReportingService runbook](ReportingService/README.md).
 
+## Notification service
+
+NotificationService subscribes to RabbitMQ domain events (`inventory.stock-low.v1`, `orders.order-confirmed.v1`, `orders.order-cancelled.v1`, `orders.purchase-order-received.v1`) and orchestrates alert dispatches to subscribed recipients across configured channels (Email and WhatsApp mock senders). It persists its own state in `stocksync_notification` on port 5436.
+
+Recipients and notification histories are tenant-isolated and protected by JWT authentication (`Owner` required for recipient creation and deletion). See the [NotificationService runbook](NotificationService/README.md).
+
 ## Security & Role-Based Authorization
 
 The solution enforces authentication and authorization across all microservices using ASP.NET Core Identity concepts and JWT Bearer tokens:
 
 - **Identity Service (`IdentityService/`)**: Authenticates users with credentials and issues signed JWT tokens containing user claims (`sub`, `email`, `role`, `tenant_id`, `tenant_name`).
 - **Seeders**: Pre-populates the demo tenant (`00000000-0000-0000-0000-000000000001`) with two initial roles and users:
-  - **Owner**: `owner@stocksync.demo` / `Owner123!*` (Full administrative privileges)
-  - **Employee**: `employee@stocksync.demo` / `Employee123!*` (Operational privileges: view inventory, draft customer orders)
-- **Protected Microservices**: `InventoryService` and `OrdersService` validate JWT tokens issued by `IdentityService` using the shared secret key, issuer, and audience.
+  - **Owner**: `owner@stocksync.demo` / `Password123!` (Full administrative privileges)
+  - **Employee**: `employee@stocksync.demo` / `Password123!` (Operational privileges: view inventory, draft customer orders)
+- **Protected Microservices**: `InventoryService`, `OrdersService`, `ReportingService`, and `NotificationService` validate JWT tokens issued by `IdentityService` using the shared symmetric secret key, issuer, and audience.
+- **Custom ProblemDetails Error Handling**: All services implement `IAuthorizationMiddlewareResultHandler` (`SecurityAuthorizationResultHandler`), returning clear, descriptive RFC 7807 JSON error responses:
+  - `401 Unauthorized`: `"Authentication is required to access this resource. Please provide a valid Bearer token."`
+  - `403 Forbidden`: `"User does not have the required role or permissions to perform this action."`
 - **Role Permissions**:
-  - `Owner`: Create/update/delete products, categories, manual stock adjustments, purchase orders, and sales order confirmations.
-  - `Employee`: View products, stock balances, categories, and create draft orders. Accessing owner-restricted endpoints returns `403 Forbidden`.
+  - `Owner`: Create/update/delete products, categories, manual stock adjustments, purchase orders, sales order confirmations, financial report summaries, and notification recipient management.
+  - `Employee`: View products, stock balances, categories, reports, and create draft orders. Accessing owner-restricted endpoints returns `403 Forbidden`.
 
-### Security Demo Script
+### Security Demo Script & Video Guide
 
 A complete test script for all 8 required evaluation scenarios is available in:
 👉 [`EndToEnd-Security-Demo.http`](file:///EndToEnd-Security-Demo.http)
@@ -223,25 +245,37 @@ To run it:
 1. Start the stack: `docker compose up -d --build`
 2. Open `EndToEnd-Security-Demo.http` in VS Code with the **REST Client** extension (or import requests into Postman/ThunderClient).
 3. Execute the scenarios sequentially to demonstrate:
-   - Microservices execution and health.
-   - Initial seeders.
-   - Login and JWT issuance for Owner and Employee.
-   - Access without token (`401 Unauthorized`).
-   - Access with valid token (`200 OK`).
-   - Access with required role (`201 Created`).
-   - Access without required role (`403 Forbidden`).
-   - Access with expired/tampered token (`401 Unauthorized`).
+   - **Scenario 1**: Microservices execution and health (`200 OK`).
+   - **Scenario 2**: Initial seeders and demo tenant/users.
+   - **Scenario 3**: Login and JWT issuance for Owner and Employee (`200 OK`).
+   - **Scenario 4**: Access without token (`401 Unauthorized`).
+   - **Scenario 5**: Access with valid token (`200 OK`).
+   - **Scenario 6**: Access with required role Owner (`201 Created`).
+   - **Scenario 7**: Access without required role Employee (`403 Forbidden`).
+   - **Scenario 8**: Access with expired/tampered token (`401 Unauthorized`).
 
-## Inventory service checks
+## Automated tests
 
-From `InventoryService`:
+To execute unit test suites across all microservices:
 
 ```sh
-dotnet test StockSync.Inventory.sln
+# Identity Service (25 unit tests)
+dotnet test IdentityService/StockSync.Identity.UnitTests/StockSync.Identity.UnitTests.csproj
 
-# Requires a PostgreSQL role with CREATE DATABASE permission.
-STOCKSYNC_TEST_POSTGRES='Host=localhost;Database=postgres;Username=postgres;Password=stock1234' \
-  dotnet test StockSync.Inventory.sln
+# Inventory Service (140 unit tests)
+dotnet test InventoryService/StockSync.Inventory.UnitTests/StockSync.Inventory.UnitTests.csproj
+
+# Orders Service (59 unit tests)
+dotnet test OrdersService/StockSync.Orders.UnitTests/StockSync.Orders.UnitTests.csproj
+
+# Reporting Service (30 unit tests)
+dotnet test ReportingService/StockSync.Reporting.UnitTests/StockSync.Reporting.UnitTests.csproj
+
+# Notification Service (25 unit tests)
+dotnet test NotificationService/StockSync.Notification.UnitTests/StockSync.Notification.UnitTests.csproj
+
+# API Gateway (TypeScript typecheck & build)
+cd ApiGateway && npm run typecheck && npm run build
 ```
 
-Run the same commands from `OrdersService` or `ReportingService` with the corresponding solution. Without that variable, PostgreSQL integration checks are skipped. Each integration check creates and removes its own database rather than changing application data. The gateway has no test directory; use `npm run typecheck` and `npm run build` to check it.
+*(Total: 279 automated tests across the solution).*

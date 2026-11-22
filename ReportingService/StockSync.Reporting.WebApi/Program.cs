@@ -1,5 +1,11 @@
-using StockSync.Reporting.Application;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using StockSync.Reporting.Application;
 using StockSync.Reporting.Application.Common;
 using StockSync.Reporting.Infrastructure;
 using StockSync.Reporting.WebApi.ExceptionHandling;
@@ -10,12 +16,66 @@ var builder = WebApplication.CreateBuilder(args.Where(a => a != "--migrate").ToA
 builder.Services.AddScoped<TenantContext>();
 builder.Services.AddScoped<ICurrentTenant>(sp => sp.GetRequiredService<TenantContext>());
 builder.Services.AddDbContext<ReportingDbContext>(o => o.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "StockSync.Identity";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "StockSync.Ecosystem";
+var jwtSecretKey = builder.Configuration["Jwt:SecretKey"]
+    ?? throw new InvalidOperationException("Jwt:SecretKey configuration is missing.");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey)),
+            RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+
+builder.Services.AddAuthorization();
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, SecurityAuthorizationResultHandler>();
+
 builder.Services.AddControllers(AutomaticValidation.Configure)
     .ConfigureApiBehaviorOptions(o => o.InvalidModelStateResponseFactory = AutomaticValidation.CreateResponse);
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(o => o.OperationFilter<TenantHeaderOperationFilter>());
+builder.Services.AddSwaggerGen(o =>
+{
+    o.OperationFilter<TenantHeaderOperationFilter>();
+    o.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT"
+    });
+    o.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 builder.Services.AddScoped<ISalesReports, SalesReports>();
 builder.Services.AddScoped<IPurchaseReports, PurchaseReports>();
 builder.Services.AddScoped<IInventoryReports, InventoryReports>();
@@ -44,7 +104,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 app.UseExceptionHandler();
+app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();
+app.UseAuthorization();
 app.MapControllers();
 app.Run();
 

@@ -13,7 +13,7 @@ export class InventoryProxyService {
   registerRoutes(app: FastifyInstance): void {
     const target = new URL(this.config.options.upstream);
     const { timeoutMs, tenantId, caPem } = this.config.options;
-    for (const { prefix, rewritePrefix } of [...inventoryRoutes, { prefix: '/swagger', rewritePrefix: '/swagger' }]) {
+    for (const { prefix, rewritePrefix } of inventoryRoutes) {
       app.register(httpProxy, {
         upstream: target.origin,
         prefix,
@@ -28,7 +28,7 @@ export class InventoryProxyService {
         retryMethods: [],
         maxRetriesOn503: 0,
         internalRewriteLocationHeader: false,
-        replyOptions: createReplyOptions(target, tenantId, prefix === '/swagger'),
+        replyOptions: createReplyOptions(target, tenantId, false),
       });
     }
   }

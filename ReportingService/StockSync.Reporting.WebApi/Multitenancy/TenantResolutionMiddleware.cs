@@ -11,9 +11,23 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
     {
         if (context.Request.Path.StartsWithSegments("/api"))
         {
-            if (!Guid.TryParse(context.Request.Headers[Header], out var id) || id == Guid.Empty)
-                throw new ValidationException(new Dictionary<string, string[]>() { [Header] = ["A valid tenant GUID is required."] });
-            tenant.Set(id);
+            var headerValue = context.Request.Headers[Header].ToString();
+            if (Guid.TryParse(headerValue, out var id) && id != Guid.Empty)
+            {
+                tenant.Set(id);
+            }
+            else
+            {
+                var claimTenant = context.User.FindFirst("tenant_id")?.Value;
+                if (!string.IsNullOrEmpty(claimTenant) && Guid.TryParse(claimTenant, out var claimId) && claimId != Guid.Empty)
+                {
+                    tenant.Set(claimId);
+                }
+                else
+                {
+                    throw new ValidationException(new Dictionary<string, string[]>() { [Header] = ["A valid tenant GUID is required."] });
+                }
+            }
         }
         return next(context);
     }

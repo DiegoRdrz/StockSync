@@ -1,0 +1,32 @@
+:root {
+  --ss-surface: var(--mantine-color-white);
+  --ss-canvas: #f5f7f6;
+  --ss-border: var(--mantine-color-gray-2);
+  --ss-muted: var(--mantine-color-gray-6);
+  --ss-level-ok: var(--mantine-color-pine-6);
+  --ss-level-low: var(--mantine-color-amber-6);
+  --ss-level-empty: var(--mantine-color-red-6);
+}
+
+[data-mantine-color-scheme='dark'] {
+  --ss-surface: var(--mantine-color-dark-6);
+  --ss-canvas: var(--mantine-color-dark-7);
+  --ss-border: var(--mantine-color-dark-4);
+  --ss-muted: var(--mantine-color-dark-2);
+}
+
+body {
+  background: var(--ss-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -231,6 +231,15 @@ services:
       timeout: 5s
       retries: 5
 
+  web:
+    build:
+      context: ./frontend
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    depends_on:
+      api-gateway:
+        condition: service_started
+
 volumes:
   inventory_data:
   identity_data:

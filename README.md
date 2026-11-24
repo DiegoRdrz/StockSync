@@ -6,6 +6,7 @@ Multi-tenant SaaS inventory, orders, identity, and reporting platform built with
 
 | Service | Docker Port | Swagger UI | Language |
 |---|---|---|---|
+| **Web frontend** | `8080` | <http://localhost:8080> (app) | React / Mantine |
 | **API Gateway** | `9090` | <http://localhost:9090/swagger> | TypeScript / NestJS |
 | **Inventory Service** | `5001` | <http://localhost:5001/swagger> | .NET 8 (English) |
 | **Identity Service** | `5002` | <http://localhost:5002/swagger> | .NET 8 (English) |
@@ -21,6 +22,7 @@ For dedicated service documentation:
 - [Reporting Service Documentation](ReportingService/README.md)
 - [Notification Service Documentation](NotificationService/README.md)
 - [API Gateway Documentation](ApiGateway/README.md)
+- [Web Frontend Documentation](frontend/README.md)
 
 ## Run with Docker
 

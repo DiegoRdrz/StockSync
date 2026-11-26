@@ -1,0 +1,17 @@
+.row {
+  padding-block: 4px 16px;
+  border-bottom: 1px solid var(--ss-border);
+}
+
+.metric {
+  padding-inline: 16px;
+}
+
+/* First column of each row sits flush with the page edge. */
+.metric:nth-child(2n + 1) { padding-inline-start: 0; }
+
+@media (min-width: $mantine-breakpoint-md) {
+  .metric { border-inline-start: 1px solid var(--ss-border); }
+  .metric:nth-child(2n + 1) { padding-inline-start: 16px; }
+  .metric:first-child { border-inline-start: 0; padding-inline-start: 0; }
+}

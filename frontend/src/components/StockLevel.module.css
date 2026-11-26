@@ -1,0 +1,32 @@
+.track {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  min-width: 64px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--ss-border) 0 calc(10% - 1px),
+    transparent calc(10% - 1px) 10%
+  ), light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5));
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ss-level-ok);
+  transition: width 180ms ease;
+}
+
+.track[data-state='low'] .fill { background: var(--ss-level-low); }
+.track[data-state='empty'] .fill { background: var(--ss-level-empty); }
+
+.tick {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: light-dark(var(--mantine-color-gray-8), var(--mantine-color-gray-0));
+}
